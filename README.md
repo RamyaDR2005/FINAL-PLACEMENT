@@ -17,7 +17,7 @@ A modern, full-stack placement management system built with Next.js 15, featurin
 
 ### Prerequisites
 
-- Node.js 18+ or Bun
+- **Bun** (recommended) or Node.js 18+
 - PostgreSQL database (Neon recommended)
 - AWS SES account
 - Google Cloud Console access
@@ -27,7 +27,7 @@ A modern, full-stack placement management system built with Next.js 15, featurin
 ```bash
 git clone <repository-url>
 cd placement-next
-bun install  # or npm install
+bun install  # Fast installation with Bun
 ```
 
 ### 2. Environment Setup
@@ -52,6 +52,13 @@ AWS_SES_SECRET_ACCESS_KEY="your-aws-secret-key"
 AWS_REGION="ap-south-1"
 AWS_SES_REGION="ap-south-1"
 EMAIL_FROM="noreply@yourdomain.com"
+
+# Cloudflare R2 Storage (for file uploads)
+CLOUDFLARE_R2_ENDPOINT="https://your-account-id.r2.cloudflarestorage.com"
+CLOUDFLARE_R2_ACCESS_KEY_ID="your-r2-access-key"
+CLOUDFLARE_R2_SECRET_ACCESS_KEY="your-r2-secret-key"
+CLOUDFLARE_R2_BUCKET_NAME="placement-documents"
+CLOUDFLARE_R2_PUBLIC_DOMAIN="https://files.yourdomain.com"
 ```
 
 ### 3. Database Setup
@@ -68,8 +75,6 @@ bunx prisma generate
 
 ```bash
 bun dev
-# or
-npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) to see the application.
@@ -100,6 +105,16 @@ Open [http://localhost:3000](http://localhost:3000) to see the application.
 3. Create SMTP credentials (IAM user with SES permissions)
 4. Update `.env` with your AWS credentials
 5. **Important**: Ensure your account is out of sandbox mode for production
+
+### Cloudflare R2 Storage Setup
+
+1. Create a Cloudflare account and access R2 Object Storage
+2. Create a new bucket (e.g., "placement-documents")
+3. Generate R2 API tokens with Admin Read & Write permissions
+4. Optional: Set up a custom domain for better performance
+5. Update `.env` with your R2 credentials
+
+📖 **Detailed R2 Setup Guide**: See [docs/CLOUDFLARE_R2_SETUP.md](./docs/CLOUDFLARE_R2_SETUP.md) for complete instructions.
 
 ### Generate NextAuth Secret
 
@@ -173,6 +188,14 @@ bun lint         # Run ESLint
 ### Database Commands
 
 ```bash
+# Using Bun scripts (recommended)
+bun run db:studio              # Open Prisma Studio
+bun run db:migrate            # Create and apply migration
+bun run db:reset              # Reset database
+bun run db:generate           # Generate Prisma client
+bun run db:push               # Push schema changes without migration
+
+# Or using bunx directly
 bunx prisma studio              # Open Prisma Studio
 bunx prisma migrate dev         # Create and apply migration
 bunx prisma migrate reset       # Reset database

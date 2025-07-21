@@ -121,7 +121,25 @@ export function LoginForm({
         }
       } else if (result?.ok) {
         toast.success("Signed in successfully!")
-        router.push("/dashboard")
+        
+        // Check if user has completed profile
+        try {
+          const profileResponse = await fetch("/api/profile")
+          if (profileResponse.ok) {
+            const profileData = await profileResponse.json()
+            if (profileData.profile?.isComplete) {
+              router.push("/dashboard")
+            } else {
+              router.push("/profile")
+            }
+          } else {
+            // If profile check fails, redirect to profile completion
+            router.push("/profile")
+          }
+        } catch (error) {
+          // If there's an error checking profile, redirect to profile
+          router.push("/profile")
+        }
       }
     } catch (error) {
       toast.error("Something went wrong. Please try again.")
@@ -132,7 +150,7 @@ export function LoginForm({
   }
 
   const handleGoogleLogin = () => {
-    signIn("google", { callbackUrl: "/dashboard" })
+    signIn("google", { callbackUrl: "/profile" })
   }
 
   return (

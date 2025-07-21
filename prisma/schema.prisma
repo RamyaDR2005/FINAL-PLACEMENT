@@ -99,9 +99,6 @@ model Profile {
   profilePhoto String? @map("profile_photo") // URL to uploaded photo
   
   // Academic Information
-  college       String?
-  collegeName   String? @map("college_name") // Full college name
-  collegeCode   String? @map("college_code")
   department    String?
   course        String?
   specialization String?
@@ -117,6 +114,7 @@ model Profile {
   twelfthBoard  String? @map("twelfth_board")
   twelfthMarks  Float?  @map("twelfth_marks")
   twelfthYear   Int?    @map("twelfth_year")
+  diplomaStream String? @map("diploma_stream")
   diplomaMarks  Float?  @map("diploma_marks")
   diplomaYear   Int?    @map("diploma_year")
   

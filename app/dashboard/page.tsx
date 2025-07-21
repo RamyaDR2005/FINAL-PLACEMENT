@@ -1,3 +1,6 @@
+import { auth } from "@/lib/auth"
+import { prisma } from "@/lib/prisma"
+import { redirect } from "next/navigation"
 import { AppSidebar } from "@/components/app-sidebar"
 import { ChartAreaInteractive } from "@/components/chart-area-interactive"
 import { DataTable } from "@/components/data-table"
@@ -10,7 +13,22 @@ import {
 
 import data from "./data.json"
 
-export default function Page() {
+export default async function Page() {
+  const session = await auth()
+  
+  if (!session?.user?.id) {
+    redirect("/login")
+  }
+
+  // Check if user has completed profile
+  const profile = await prisma.profile.findUnique({
+    where: { userId: session.user.id }
+  })
+
+  // If profile is not complete, redirect to profile completion
+  if (!profile?.isComplete) {
+    redirect("/profile")
+  }
   return (
     <SidebarProvider
       style={
