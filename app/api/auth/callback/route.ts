@@ -20,19 +20,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL("/admin/dashboard", request.url))
     }
 
-    // Check if user has a profile and if it's complete
-    const profile = await prisma.profile.findUnique({
-      where: { userId: session.user.id },
-      select: { isComplete: true }
-    })
-
-    // If profile exists and is complete, go to dashboard
-    if (profile?.isComplete) {
-      return NextResponse.redirect(new URL("/dashboard", request.url))
-    }
-
-    // Otherwise, go to profile completion page
-    return NextResponse.redirect(new URL("/profile", request.url))
+    // For all other users (Students, etc.), redirect to the dashboard
+    // We no longer force users to the /profile page based on completion status
+    return NextResponse.redirect(new URL("/dashboard", request.url))
   } catch (error) {
     console.error("Auth callback error:", error)
     return NextResponse.redirect(new URL("/login", request.url))
