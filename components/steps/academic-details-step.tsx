@@ -11,15 +11,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { DatePicker } from "@/components/ui/date-picker"
 import { DocumentUpload } from "@/components/ui/document-upload"
-import { ArrowLeft, Upload } from "lucide-react"
+import { ArrowLeft, Loader2 } from "lucide-react"
 
 interface AcademicDetailsStepProps {
   onNext: (data: any) => void
   onPrevious: () => void
+  onSave: (data: any) => void
+  isSaving?: boolean
   initialData?: any
 }
 
-export function AcademicDetailsStep({ onNext, onPrevious, initialData = {} }: AcademicDetailsStepProps) {
+export function AcademicDetailsStep({ onNext, onPrevious, onSave, isSaving, initialData = {} }: AcademicDetailsStepProps) {
   const [formData, setFormData] = useState({
     // 10th Standard
     tenthSchool: initialData.tenthSchool || "",
@@ -561,45 +563,21 @@ export function AcademicDetailsStep({ onNext, onPrevious, initialData = {} }: Ac
               </div>
             </div>
 
-            <div>
-              <Label htmlFor="tenthMarksCard">Upload 10th Marks Card *</Label>
-              <div className="mt-2 space-y-2">
-                <Input
-                  id="tenthMarksCard"
-                  type="file"
-                  accept="image/jpeg,image/png,application/pdf"
-                  onChange={(e) => handleFileUpload("tenthMarksCard", e.target.files?.[0] || null)}
-                  className={`w-full ${errors.tenthMarksCard ? "border-red-500" : ""}`}
-                />
-
-                {/* Display existing file or selected file */}
-                {formData.tenthMarksCard && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 p-2 rounded">
-                    {typeof formData.tenthMarksCard === 'string' ? (
-                      <div className="flex items-center gap-2 w-full">
-                        <span className="text-green-600 font-medium">✓ Uploaded</span>
-                        <a
-                          href={formData.tenthMarksCard}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="ml-auto text-blue-600 hover:underline text-xs"
-                        >
-                          View Current File
-                        </a>
-                      </div>
-                    ) : (
-                      <>
-                        <Upload className="h-4 w-4" />
-                        <span>File selected: {(formData.tenthMarksCard as File)?.name}</span>
-                      </>
-                    )}
-                  </div>
-                )}
-
-                {errors.tenthMarksCard && <p className="text-sm text-red-500 mt-1">{errors.tenthMarksCard}</p>}
-                <p className="text-xs text-muted-foreground mt-1">Format: USN_10th_MarksCard.jpg/pdf • Max 20MB • JPG/PNG/PDF</p>
-              </div>
-            </div>
+            <DocumentUpload
+              onFileChange={(file) => handleFileUpload("tenthMarksCard", file)}
+              accept="image/jpeg,image/png,application/pdf"
+              maxSizeMB={20}
+              label="Upload 10th Marks Card"
+              required={true}
+              error={errors.tenthMarksCard}
+              initialFile={
+                typeof formData.tenthMarksCard === 'string'
+                  ? { url: formData.tenthMarksCard, name: "Uploaded 10th Marks Card" }
+                  : formData.tenthMarksCard as File | null
+              }
+              description="• Format: USN_10th_MarksCard.jpg/pdf<br>• Maximum file size: 20MB • JPG/PNG/PDF accepted"
+              placeholder="Drop your 10th marks card here or click to select"
+            />
           </CardContent>
         </Card>
 
@@ -1283,11 +1261,13 @@ export function AcademicDetailsStep({ onNext, onPrevious, initialData = {} }: Ac
           )
         }
 
-        <div className="flex justify-between pt-4">
-          <Button type="button" variant="outline" onClick={onPrevious} className="flex items-center gap-2">
-            <ArrowLeft className="w-4 h-4" />
-            Previous
-          </Button>
+        <div className="flex justify-between items-center pt-4">
+          <div className="flex gap-4">
+            <Button type="button" variant="outline" onClick={onPrevious} className="flex items-center gap-2">
+              <ArrowLeft className="w-4 h-4" />
+              Previous
+            </Button>
+          </div>
           <Button type="submit" size="lg" className="px-8 py-3">
             Next Step
           </Button>

@@ -1,0 +1,96 @@
+﻿node.exe : 
+At C:\Program Files\n
+odejs\npx.ps1:29 
+char:3
++   & $NODE_EXE 
+$NPX_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~
+    + CategoryInfo   
+           : NotSpe  
+  cified: (:String   
+ ) [], RemoteExce    
+ption
+    + FullyQualified 
+   ErrorId : Native  
+  CommandError
+ 
+node:internal/modules
+/run_main:123
+    triggerUncaughtEx
+ception(
+    ^
+Error [ERR_MODULE_NOT
+_FOUND]: Cannot find 
+module 'C:\Users\ACER
+\OneDrive\Desktop\new
+-placement\Placement_
+site\verify-prisma.ts
+' imported from C:\Us
+ers\ACER\OneDrive\Des
+ktop\new-placement\Pl
+acement_site\
+    at 
+finalizeResolution (n
+ode:internal/modules/
+esm/resolve:275:11)
+    at moduleResolve 
+(node:internal/module
+s/esm/resolve:860:10)
+    at 
+defaultResolve (node:
+internal/modules/esm/
+resolve:984:11)
+    at nextResolve (n
+ode:internal/modules/
+esm/hooks:748:28)
+    at resolveBase (f
+ile:///C:/Users/ACER/
+OneDrive/Desktop/new-
+placement/Placement_s
+ite/node_modules/.pnp
+m/tsx@4.21.0/node_mod
+ules/tsx/dist/esm/ind
+ex.mjs?1771953281764:
+2:3744)
+    at async 
+resolveDirectory (fil
+e:///C:/Users/ACER/On
+eDrive/Desktop/new-pl
+acement/Placement_sit
+e/node_modules/.pnpm/
+tsx@4.21.0/node_modul
+es/tsx/dist/esm/index
+.mjs?1771953281764:2:
+4237)
+    at async resolve 
+(file:///C:/Users/ACE
+R/OneDrive/Desktop/ne
+w-placement/Placement
+_site/node_modules/.p
+npm/tsx@4.21.0/node_m
+odules/tsx/dist/esm/i
+ndex.mjs?177195328176
+4:2:5355)
+    at async 
+nextResolve (node:int
+ernal/modules/esm/hoo
+ks:748:22)
+    at async 
+Hooks.resolve (node:i
+nternal/modules/esm/h
+ooks:240:24)
+    at async 
+handleMessage (node:i
+nternal/modules/esm/w
+orker:199:18) {
+  code: 'ERR_MODULE_N
+OT_FOUND',
+  url: 'file:///C:/Us
+ers/ACER/OneDrive/Des
+ktop/new-placement/Pl
+acement_site/verify-p
+risma.ts'
+}
+
+Node.js v22.17.1

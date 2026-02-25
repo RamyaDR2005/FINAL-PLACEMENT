@@ -39,6 +39,9 @@ export function ReviewStep({ onPrevious, formData }: ReviewStepProps) {
         middleName: personalInfo.middleName || ".",
         lastName: personalInfo.lastName || undefined,
         dateOfBirth: personalInfo.dateOfBirth ? new Date(personalInfo.dateOfBirth).toISOString() : undefined,
+        dobDay: personalInfo.dateOfBirth ? new Date(personalInfo.dateOfBirth).getDate().toString().padStart(2, "0") : undefined,
+        dobMonth: personalInfo.dateOfBirth ? (new Date(personalInfo.dateOfBirth).getMonth() + 1).toString().padStart(2, "0") : undefined,
+        dobYear: personalInfo.dateOfBirth ? new Date(personalInfo.dateOfBirth).getFullYear().toString() : undefined,
         gender: personalInfo.gender || undefined,
         bloodGroup: personalInfo.bloodGroup || undefined,
         state: personalInfo.state || undefined,
@@ -102,12 +105,12 @@ export function ReviewStep({ onPrevious, formData }: ReviewStepProps) {
         tenthBoard: tenthDetails.tenthBoard || undefined,
         tenthPassingYear: tenthDetails.tenthPassingYear ? parseInt(tenthDetails.tenthPassingYear) : undefined,
         tenthPassingMonth: tenthDetails.tenthPassingMonth || undefined,
-        tenthPercentage: tenthDetails.tenthPercentage ? parseFloat(tenthDetails.tenthPercentage) : undefined,
-        tenthAreaDistrictCity: tenthDetails.tenthAreaDistrictCity || undefined,
+        tenthPercentage: (tenthDetails.tenthPercentage !== undefined && tenthDetails.tenthPercentage !== "") ? parseFloat(tenthDetails.tenthPercentage) : undefined,
+        tenthAreaDistrictCity: tenthDetails.tenthAreaDistrictCity || [tenthDetails.tenthArea, tenthDetails.tenthDistrict, tenthDetails.tenthCity].filter(Boolean).join(", ") || undefined,
         tenthMarksCard: tenthDetails.tenthMarksCard || undefined,
 
         // 12th / Diploma Details
-        academicLevel: twelfthDiplomaDetails.twelfthOrDiploma || undefined,
+        academicLevel: twelfthDiplomaDetails.twelfthOrDiploma || twelfthDiplomaDetails.academicLevel || undefined,
         twelfthSchool: twelfthDiplomaDetails.twelfthSchool || twelfthDiplomaDetails.twelfthSchoolName || undefined,
         twelfthSchoolName: twelfthDiplomaDetails.twelfthSchoolName || twelfthDiplomaDetails.twelfthSchool || undefined,
         twelfthArea: twelfthDiplomaDetails.twelfthArea || undefined,
@@ -130,7 +133,7 @@ export function ReviewStep({ onPrevious, formData }: ReviewStepProps) {
         diplomaCity: twelfthDiplomaDetails.diplomaCity || undefined,
         diplomaPincode: twelfthDiplomaDetails.diplomaPincode || undefined,
         diplomaState: twelfthDiplomaDetails.diplomaState || undefined,
-        diplomaPercentage: twelfthDiplomaDetails.diplomaPercentage ? parseFloat(twelfthDiplomaDetails.diplomaPercentage) : undefined,
+        diplomaPercentage: (twelfthDiplomaDetails.diplomaPercentage !== undefined && twelfthDiplomaDetails.diplomaPercentage !== "") ? parseFloat(twelfthDiplomaDetails.diplomaPercentage) : undefined,
         diplomaCertificates: twelfthDiplomaDetails.diplomaCertificates || twelfthDiplomaDetails.diplomaCertificate || undefined,
         diplomaFirstYear: twelfthDiplomaDetails.diplomaFirstYear || undefined,
         diplomaSecondYear: twelfthDiplomaDetails.diplomaSecondYear || undefined,
@@ -355,11 +358,13 @@ export function ReviewStep({ onPrevious, formData }: ReviewStepProps) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-muted-foreground">School Name</p>
-                <p className="font-medium">{tenthDetails.tenthSchoolName || "Not provided"}</p>
+                <p className="font-medium">{tenthDetails.tenthSchool || tenthDetails.tenthSchoolName || "Not provided"}</p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Location</p>
-                <p className="font-medium">{tenthDetails.tenthAreaDistrictCity || "Not provided"}</p>
+                <p className="font-medium">
+                  {tenthDetails.tenthAreaDistrictCity || [tenthDetails.tenthArea, tenthDetails.tenthDistrict, tenthDetails.tenthCity].filter(Boolean).join(", ") || "Not provided"}
+                </p>
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Board</p>
@@ -410,12 +415,12 @@ export function ReviewStep({ onPrevious, formData }: ReviewStepProps) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">School Name</p>
-                  <p className="font-medium">{twelfthDiplomaDetails.twelfthSchoolName || "Not provided"}</p>
+                  <p className="font-medium">{twelfthDiplomaDetails.twelfthSchool || twelfthDiplomaDetails.twelfthSchoolName || "Not provided"}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Location</p>
                   <p className="font-medium">
-                    {[twelfthDiplomaDetails.twelfthArea, twelfthDiplomaDetails.twelfthDistrict, twelfthDiplomaDetails.twelfthCity].filter(Boolean).join(', ') || "Not provided"}
+                    {twelfthDiplomaDetails.twelfthAreaDistrictCity || [twelfthDiplomaDetails.twelfthArea, twelfthDiplomaDetails.twelfthDistrict, twelfthDiplomaDetails.twelfthCity].filter(Boolean).join(', ') || "Not provided"}
                   </p>
                 </div>
                 <div>
@@ -428,7 +433,10 @@ export function ReviewStep({ onPrevious, formData }: ReviewStepProps) {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Percentage</p>
-                  <p className="font-medium">{twelfthDiplomaDetails.twelfthStatePercentage ? `${twelfthDiplomaDetails.twelfthStatePercentage}%` : "Not provided"}</p>
+                  <p className="font-medium">
+                    {twelfthDiplomaDetails.twelfthPercentage ? `${twelfthDiplomaDetails.twelfthPercentage}%` :
+                      twelfthDiplomaDetails.twelfthStatePercentage ? `${twelfthDiplomaDetails.twelfthStatePercentage}%` : "Not provided"}
+                  </p>
                 </div>
               </div>
             )}

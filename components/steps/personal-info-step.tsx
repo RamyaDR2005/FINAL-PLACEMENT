@@ -11,14 +11,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { DatePicker } from "@/components/ui/date-picker"
 import { ProfilePhotoUpload } from "@/components/ui/profile-photo-upload"
-import { ArrowLeft, AlertCircle, Upload, X, User, Camera } from "lucide-react"
+import { ArrowLeft, AlertCircle, Upload, X, User, Camera, Loader2 } from "lucide-react"
 
 interface PersonalInfoStepProps {
   onNext: (data: any) => void
+  onSave: (data: any) => void
+  isSaving?: boolean
   initialData?: any
 }
 
-export function PersonalInfoStep({ onNext, initialData = {} }: PersonalInfoStepProps) {
+export function PersonalInfoStep({ onNext, onSave, isSaving, initialData = {} }: PersonalInfoStepProps) {
   const [formData, setFormData] = useState({
     firstName: initialData.firstName || "",
     middleName: initialData.middleName || ".",
@@ -343,7 +345,7 @@ export function PersonalInfoStep({ onNext, initialData = {} }: PersonalInfoStepP
           </div>
         </Card>
 
-        <div className="flex justify-end pt-6">
+        <div className="flex justify-end items-center pt-6">
           <Button type="submit" size="lg" className="px-8 h-11 text-sm font-medium tracking-[-0.01em]">
             Next Step
           </Button>

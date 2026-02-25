@@ -9,15 +9,17 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
-import { AlertCircle, ArrowLeft, Copy } from "lucide-react"
+import { AlertCircle, ArrowLeft, Copy, Loader2, Upload } from "lucide-react"
 
 interface ContactDetailsStepProps {
   onNext: (data: any) => void
   onPrevious: () => void
+  onSave: (data: any) => void
+  isSaving?: boolean
   initialData?: any
 }
 
-export function ContactDetailsStep({ onNext, onPrevious, initialData = {} }: ContactDetailsStepProps) {
+export function ContactDetailsStep({ onNext, onPrevious, onSave, isSaving, initialData = {} }: ContactDetailsStepProps) {
   const [formData, setFormData] = useState({
     studentEmail: initialData.studentEmail || "",
     callingNumber: initialData.callingNumber || "",
@@ -153,12 +155,11 @@ export function ContactDetailsStep({ onNext, onPrevious, initialData = {} }: Con
                 id="studentEmail"
                 type="email"
                 value={formData.studentEmail}
-                onChange={(e) => handleInputChange("studentEmail", e.target.value)}
-                className={`w-full ${errors.studentEmail ? "border-red-500" : ""}`}
-                placeholder="your.email@gmail.com"
+                readOnly
+                disabled
+                className="w-full bg-muted cursor-not-allowed opacity-75"
               />
-              {errors.studentEmail && <p className="text-sm text-red-500 mt-1">{errors.studentEmail}</p>}
-              <p className="text-xs text-muted-foreground mt-1">Use a professional email like yourname@gmail.com</p>
+              <p className="text-xs text-muted-foreground mt-1">✓ Auto-filled from your login account. Cannot be edited.</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -520,11 +521,13 @@ export function ContactDetailsStep({ onNext, onPrevious, initialData = {} }: Con
           </CardContent>
         </Card>
 
-        <div className="flex justify-between pt-4">
-          <Button type="button" variant="outline" onClick={onPrevious} className="flex items-center gap-2">
-            <ArrowLeft className="w-4 h-4" />
-            Previous
-          </Button>
+        <div className="flex justify-between items-center pt-4">
+          <div className="flex gap-4">
+            <Button type="button" variant="outline" onClick={onPrevious} className="flex items-center gap-2">
+              <ArrowLeft className="w-4 h-4" />
+              Previous
+            </Button>
+          </div>
           <Button type="submit" size="lg" className="px-8 py-3">
             Next Step
           </Button>

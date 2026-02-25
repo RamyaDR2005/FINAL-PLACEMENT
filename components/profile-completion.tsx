@@ -8,7 +8,8 @@ import { EngineeringDetailsStep } from "@/components/steps/engineering-details-s
 import { CollegeIdStep } from "@/components/steps/college-id-step"
 import { ReviewStep } from "@/components/steps/review-step"
 import { Card, CardContent } from "@/components/ui/card"
-import { CheckCircle2, Circle } from "lucide-react"
+import { CheckCircle2, Circle, Loader2 } from "lucide-react"
+import { toast } from "sonner"
 
 enum Step {
     PERSONAL_INFO = 1,
@@ -19,8 +20,9 @@ enum Step {
     REVIEW = 6,
 }
 
-export function ProfileCompletion({ profile }: { profile: any }) {
-    const [currentStep, setCurrentStep] = useState<Step>(Step.PERSONAL_INFO)
+export function ProfileCompletion({ profile, userEmail }: { profile: any, userEmail: string }) {
+    const [currentStep, setCurrentStep] = useState<Step>(profile?.completionStep || Step.PERSONAL_INFO)
+    const [isSaving, setIsSaving] = useState(false)
     // Extract document data from profile.user.document
     const documentData = profile?.user?.document || {}
 
@@ -39,7 +41,7 @@ export function ProfileCompletion({ profile }: { profile: any }) {
         },
 
         contactDetails: {
-            studentEmail: profile?.studentEmail || profile?.email || "",
+            studentEmail: profile?.studentEmail || profile?.email || userEmail || "",
             callingNumber: profile?.callingNumber || profile?.callingMobile || "",
             whatsappNumber: profile?.whatsappNumber || profile?.whatsappMobile || "",
             altNumber: profile?.altNumber || profile?.alternativeMobile || "",
@@ -129,109 +131,142 @@ export function ProfileCompletion({ profile }: { profile: any }) {
         { id: Step.REVIEW, label: "Review" },
     ]
 
-    const handleNext = (data: any) => {
-        setFormData((prev: any) => {
-            const updated = { ...prev }
+    const handleNext = async (data: any) => {
+        // First save the current data and advance the step in DB
+        await saveProfile(data, true)
+    }
 
-            switch (currentStep) {
-                case Step.PERSONAL_INFO:
-                    updated.personalInfo = data
-                    break
-
-                case Step.CONTACT_DETAILS:
-                    // Store all raw data from the step, and then add computed/mapped fields
-                    updated.contactDetails = {
-                        ...data,
-                        // Mapped keys for DB compatibility
-                        email: data.studentEmail,
-                        callingMobile: data.callingNumber,
-                        whatsappMobile: data.whatsappNumber,
-                        alternativeMobile: data.altNumber,
-
-                        // Parent details. Full names computed here for convenience, or can be done in ReviewStep
-                        fatherName: `${data.fatherFirstName || ""} ${data.fatherMiddleName || ""} ${data.fatherLastName || ""}`.replace(/\s+/g, " ").trim(),
-                        motherName: `${data.motherFirstName || ""} ${data.motherMiddleName || ""} ${data.motherLastName || ""}`.replace(/\s+/g, " ").trim(),
-                    }
-                    // Store address fields separately
-                    updated.addressDetails = {
-                        currentHouse: data.currentHouse,
-                        currentCross: data.currentCross,
-                        currentArea: data.currentArea,
-                        currentDistrict: data.currentDistrict,
-                        currentCity: data.currentCity,
-                        currentPincode: data.currentPincode,
-                        currentState: data.currentState,
-                        sameAsCurrent: data.sameAsCurrent,
-                        permanentHouse: data.permanentHouse,
-                        permanentCross: data.permanentCross,
-                        permanentArea: data.permanentArea,
-                        permanentDistrict: data.permanentDistrict,
-                        permanentCity: data.permanentCity,
-                        permanentPincode: data.permanentPincode,
-                        permanentState: data.permanentState,
-                    }
-                    break
-
-                case Step.ACADEMIC_DETAILS:
-                    updated.rawAcademicDetails = data
-                    // Map AcademicDetailsStep output to ReviewStep expectations
-                    updated.tenthDetails = {
-                        tenthSchoolName: data.tenthSchool,
-                        tenthAreaDistrictCity: `${data.tenthArea || ""}, ${data.tenthDistrict || ""}, ${data.tenthCity || ""}`,
-                        tenthBoard: data.tenthBoard,
-                        tenthPassingYear: data.tenthPassingYear,
-                        tenthPassingMonth: data.tenthPassingMonth,
-                        tenthPercentage: data.tenthPercentage,
-                        tenthMarksCard: data.tenthMarksCard,
-                        // Include all raw fields for the review step as well
-                        ...data
-                    }
-
-                    updated.twelfthDiplomaDetails = {
-                        twelfthOrDiploma: data.academicLevel,
-
-                        // 12th fields
-                        twelfthSchoolName: data.twelfthSchool,
-                        twelfthArea: data.twelfthArea,
-                        twelfthDistrict: data.twelfthDistrict,
-                        twelfthCity: data.twelfthCity,
-                        twelfthBoard: data.twelfthBoard,
-                        twelfthPassingYear: data.twelfthPassingYear,
-                        twelfthStatePercentage: data.twelfthPercentage,
-                        twelfthMarksCard: data.twelfthMarksCard,
-
-                        // Diploma fields
-                        diplomaCollege: data.diplomaCollege,
-                        diplomaArea: data.diplomaArea,
-                        diplomaDistrict: data.diplomaDistrict,
-                        diplomaCity: data.diplomaCity,
-                        diplomaPercentage: data.diplomaPercentage,
-                        diplomaCertificates: data.diplomaCertificates,
-
-                        // Include raw choice data
-                        ...data
-                    }
-                    break
-
-                case Step.ENGINEERING_DETAILS:
-                    updated.engineeringDetails = data // collegeName, usn, etc match
-
-                    updated.engineeringAcademicDetails = {
-                        ...data,
-                        activeBacklogs: data.hasBacklogs === "yes",
-                        finalCgpa: data.finalCgpa,
-                    }
-                    break
-
-                case Step.COLLEGE_ID:
-                    updated.collegeIdDetails = data
-                    break
+    const saveProfile = async (data: any = null, advanceStep = false) => {
+        setIsSaving(true)
+        try {
+            // If data is provided, it's the latest from a step, so we update formData FIRST
+            let dataToSave = formData
+            if (data) {
+                // Determine which section to update based on current step
+                const updated = { ...formData }
+                switch (currentStep) {
+                    case Step.PERSONAL_INFO:
+                        updated.personalInfo = data
+                        break
+                    case Step.CONTACT_DETAILS:
+                        updated.contactDetails = {
+                            ...data,
+                            email: data.studentEmail,
+                            callingMobile: data.callingNumber,
+                            whatsappMobile: data.whatsappNumber,
+                            alternativeMobile: data.altNumber,
+                            fatherName: `${data.fatherFirstName || ""} ${data.fatherMiddleName || ""} ${data.fatherLastName || ""}`.replace(/\s+/g, " ").trim(),
+                            motherName: `${data.motherFirstName || ""} ${data.motherMiddleName || ""} ${data.motherLastName || ""}`.replace(/\s+/g, " ").trim(),
+                        }
+                        updated.addressDetails = {
+                            currentHouse: data.currentHouse,
+                            currentCross: data.currentCross,
+                            currentArea: data.currentArea,
+                            currentDistrict: data.currentDistrict,
+                            currentCity: data.currentCity,
+                            currentPincode: data.currentPincode,
+                            currentState: data.currentState,
+                            sameAsCurrent: data.sameAsCurrent,
+                            permanentHouse: data.permanentHouse,
+                            permanentCross: data.permanentCross,
+                            permanentArea: data.permanentArea,
+                            permanentDistrict: data.permanentDistrict,
+                            permanentCity: data.permanentCity,
+                            permanentPincode: data.permanentPincode,
+                            permanentState: data.permanentState,
+                        }
+                        break
+                    case Step.ACADEMIC_DETAILS:
+                        updated.rawAcademicDetails = data
+                        updated.tenthDetails = {
+                            tenthSchoolName: data.tenthSchool,
+                            tenthBoard: data.tenthBoard,
+                            tenthPassingYear: data.tenthPassingYear,
+                            tenthPercentage: data.tenthPercentage,
+                            tenthMarksCard: data.tenthMarksCard,
+                            ...data
+                        }
+                        updated.twelfthDiplomaDetails = {
+                            twelfthOrDiploma: data.academicLevel,
+                            twelfthSchoolName: data.twelfthSchool,
+                            twelfthStatePercentage: data.twelfthPercentage,
+                            twelfthMarksCard: data.twelfthMarksCard,
+                            diplomaCollege: data.diplomaCollege,
+                            diplomaPercentage: data.diplomaPercentage,
+                            ...data
+                        }
+                        break
+                    case Step.ENGINEERING_DETAILS:
+                        updated.engineeringDetails = data
+                        updated.engineeringAcademicDetails = {
+                            ...data,
+                            activeBacklogs: data.hasBacklogs === "yes",
+                            finalCgpa: data.finalCgpa,
+                        }
+                        break
+                    case Step.COLLEGE_ID:
+                        updated.collegeIdDetails = data
+                        break
+                }
+                setFormData(updated)
+                dataToSave = updated
             }
 
-            return updated
-        })
+            // Flatten data for API
+            const payload = {
+                ...dataToSave.personalInfo,
+                ...dataToSave.contactDetails,
+                ...dataToSave.addressDetails,
+                ...dataToSave.tenthDetails,
+                ...dataToSave.twelfthDiplomaDetails,
+                ...dataToSave.engineeringDetails,
+                ...dataToSave.engineeringAcademicDetails,
+                ...dataToSave.collegeIdDetails,
+                // Include current progress step
+                completionStep: advanceStep ? Math.min(Step.REVIEW, currentStep + 1) : currentStep
+            }
 
-        setCurrentStep((prev) => prev + 1)
+            // Remove frontend-only fields that are not in Prisma schema
+            delete payload.twelfthOrDiploma
+            delete payload.rawAcademicDetails
+
+            // Extract DOB components if dateOfBirth exists
+            if (payload.dateOfBirth) {
+                const dob = new Date(payload.dateOfBirth)
+                if (!isNaN(dob.getTime())) {
+                    payload.dobDay = dob.getDate().toString().padStart(2, "0")
+                    payload.dobMonth = (dob.getMonth() + 1).toString().padStart(2, "0")
+                    payload.dobYear = dob.getFullYear().toString()
+                }
+            }
+
+            const response = await fetch("/api/profile", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            })
+
+            if (!response.ok) {
+                const errorData = await response.json()
+                throw new Error(errorData.error || "Failed to save profile")
+            }
+
+            toast.success("Progress saved successfully")
+
+            // Advance the step in UI if requested
+            if (advanceStep) {
+                setCurrentStep((prev) => Math.min(Step.REVIEW, prev + 1))
+            }
+        } catch (error: any) {
+            console.error("Save error:", error)
+            toast.error(error.message || "Failed to save progress")
+        } finally {
+            setIsSaving(false)
+        }
+    }
+
+    const handleStepClick = (stepId: number) => {
+        setCurrentStep(stepId as Step)
     }
 
     const handlePrevious = () => {
@@ -244,6 +279,8 @@ export function ProfileCompletion({ profile }: { profile: any }) {
                 return (
                     <PersonalInfoStep
                         onNext={handleNext}
+                        onSave={(data) => saveProfile(data, true)}
+                        isSaving={isSaving}
                         initialData={formData.personalInfo}
                     />
                 )
@@ -252,6 +289,8 @@ export function ProfileCompletion({ profile }: { profile: any }) {
                     <ContactDetailsStep
                         onNext={handleNext}
                         onPrevious={handlePrevious}
+                        onSave={(data) => saveProfile(data, true)}
+                        isSaving={isSaving}
                         initialData={{ ...formData.contactDetails, ...formData.addressDetails }}
                     />
                 )
@@ -260,6 +299,8 @@ export function ProfileCompletion({ profile }: { profile: any }) {
                     <AcademicDetailsStep
                         onNext={handleNext}
                         onPrevious={handlePrevious}
+                        onSave={(data) => saveProfile(data, true)}
+                        isSaving={isSaving}
                         initialData={formData.rawAcademicDetails || {}}
                     />
                 )
@@ -268,6 +309,8 @@ export function ProfileCompletion({ profile }: { profile: any }) {
                     <EngineeringDetailsStep
                         onNext={handleNext}
                         onPrevious={handlePrevious}
+                        onSave={(data) => saveProfile(data, true)}
+                        isSaving={isSaving}
                         initialData={formData.engineeringDetails}
                     />
                 )
@@ -276,6 +319,8 @@ export function ProfileCompletion({ profile }: { profile: any }) {
                     <CollegeIdStep
                         onNext={handleNext}
                         onPrevious={handlePrevious}
+                        onSave={(data) => saveProfile(data, true)}
+                        isSaving={isSaving}
                         initialData={formData.collegeIdDetails}
                     />
                 )
@@ -302,13 +347,17 @@ export function ProfileCompletion({ profile }: { profile: any }) {
                         const isCurrent = currentStep === step.id
 
                         return (
-                            <div key={step.id} className="flex flex-col items-center gap-2 bg-background px-2">
+                            <div
+                                key={step.id}
+                                className={`flex flex-col items-center gap-2 bg-background px-2 group`}
+                            >
                                 <div
                                     className={`
                                         w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all duration-200
                                         ${isCompleted ? "bg-green-600 border-green-600 text-white" :
                                             isCurrent ? "bg-blue-600 border-blue-600 text-white" :
                                                 "bg-background border-gray-300 text-gray-400"}
+                                        group-hover:scale-110
                                     `}
                                 >
                                     {isCompleted ? (
@@ -317,7 +366,7 @@ export function ProfileCompletion({ profile }: { profile: any }) {
                                         <span className="text-xs font-semibold">{step.id}</span>
                                     )}
                                 </div>
-                                <span className={`text-xs font-medium ${isCurrent ? "text-blue-600" : "text-muted-foreground"} hidden sm:block`}>
+                                <span className={`text-xs font-medium transition-colors ${isCurrent ? "text-blue-600" : "text-muted-foreground group-hover:text-blue-400"} hidden sm:block`}>
                                     {step.label}
                                 </span>
                             </div>

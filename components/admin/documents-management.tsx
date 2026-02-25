@@ -12,12 +12,13 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { 
-    ExternalLink, 
-    Download, 
-    Settings2, 
+import {
+    ExternalLink,
+    Download,
+    Settings2,
     CheckSquare,
-    Square
+    Square,
+    Loader2
 } from "lucide-react"
 import { getDocumentUrl } from "@/lib/document-utils"
 import * as XLSX from "xlsx"
@@ -80,7 +81,55 @@ interface DocumentsManagementProps {
 
 export function DocumentsManagement({ users, publicDomain }: DocumentsManagementProps) {
     const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set())
-    
+    const [loadingDoc, setLoadingDoc] = useState<string | null>(null)
+
+    // Secure Document Viewer Flow
+    const handleViewSecurely = async (path: string, label: string) => {
+        if (!path) return
+
+        try {
+            setLoadingDoc(path)
+
+            // 1. Extract the key from the path
+            let key = path
+            if (path.includes("://")) {
+                const usersIndex = path.indexOf("/users/")
+                if (usersIndex !== -1) {
+                    key = path.substring(usersIndex + 1)
+                } else {
+                    const parts = path.split("/")
+                    if (parts.length > 3) {
+                        key = parts.slice(3).join("/")
+                    }
+                }
+            } else if (path.startsWith("/")) {
+                key = path.substring(1)
+            }
+
+            // 2. Fetch the file through our secure backend proxy
+            // This avoids CORS issues and keeps the R2 URLs entirely internal
+            const fileResponse = await fetch(`/api/admin/documents/download?key=${encodeURIComponent(key)}`)
+            if (!fileResponse.ok) {
+                const errorBody = await fileResponse.text()
+                throw new Error(`Access Error: ${fileResponse.status} ${errorBody}`)
+            }
+
+            // 4. Create a blob from the response
+            const blob = await fileResponse.blob()
+            const blobUrl = URL.createObjectURL(blob)
+
+            // 5. Open in a new tab
+            window.open(blobUrl, "_blank")
+
+            toast.success(`Opening ${label}`)
+        } catch (error) {
+            console.error("Error viewing document:", error)
+            toast.error(error instanceof Error ? error.message : "Could not view document securely")
+        } finally {
+            setLoadingDoc(null)
+        }
+    }
+
     // Standard Document Columns
     const standardColumns = [
         { id: "resume", label: "Resume", key: "resume", source: "profile" },
@@ -171,7 +220,7 @@ export function DocumentsManagement({ users, publicDomain }: DocumentsManagement
 
     // ✅ FIXED: Clean client-side export with Clickable Hyperlinks
     const handleExport = () => {
-        const selectedUsers = selectedUserIds.size > 0 
+        const selectedUsers = selectedUserIds.size > 0
             ? users.filter(u => selectedUserIds.has(u.id))
             : users
 
@@ -226,7 +275,7 @@ export function DocumentsManagement({ users, publicDomain }: DocumentsManagement
                     const cell_address = { c: C, r: R }
                     const cell_ref = XLSX.utils.encode_cell(cell_address)
                     const cell = worksheet[cell_ref]
-                    
+
                     if (cell && cell.t === "s" && typeof cell.v === "string" && cell.v.startsWith("http")) {
                         cell.l = { Target: cell.v, Tooltip: "Click to view document" }
                         cell.v = "View Document" // Make it cleaner in Excel
@@ -266,18 +315,21 @@ export function DocumentsManagement({ users, publicDomain }: DocumentsManagement
     const renderLink = (url: string | null | undefined, label: string) => {
         if (!url) return <span className="text-gray-400 text-xs">-</span>
 
-        const fileUrl = getDocumentUrl(url, publicDomain)
+        const isLoading = loadingDoc === url
 
         return (
-            <a
-                href={fileUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 text-xs font-semibold whitespace-nowrap transition-colors"
+            <button
+                onClick={() => handleViewSecurely(url, label)}
+                disabled={isLoading}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 text-xs font-semibold whitespace-nowrap transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 title={label}
             >
-                View <ExternalLink className="w-3.5 h-3.5" />
-            </a>
+                {isLoading ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                    <>View <ExternalLink className="w-3.5 h-3.5" /></>
+                )}
+            </button>
         )
     }
 
@@ -316,12 +368,12 @@ export function DocumentsManagement({ users, publicDomain }: DocumentsManagement
                                 <DropdownMenuCheckboxItem checked={visibleColumns.has("name")} onCheckedChange={() => toggleColumn("name")}>Name</DropdownMenuCheckboxItem>
                                 <DropdownMenuCheckboxItem checked={visibleColumns.has("cgpa")} onCheckedChange={() => toggleColumn("cgpa")}>CGPA</DropdownMenuCheckboxItem>
                                 <DropdownMenuCheckboxItem checked={visibleColumns.has("status")} onCheckedChange={() => toggleColumn("status")}>KYC Status</DropdownMenuCheckboxItem>
-                                
+
                                 <DropdownMenuSeparator />
                                 <DropdownMenuLabel className="flex items-center justify-between">
                                     Academic Documents
                                     <div className="flex gap-2">
-                                        <button 
+                                        <button
                                             className="text-[10px] text-blue-600 hover:underline font-normal"
                                             onClick={(e) => {
                                                 e.preventDefault()
@@ -332,7 +384,7 @@ export function DocumentsManagement({ users, publicDomain }: DocumentsManagement
                                         >
                                             Select All
                                         </button>
-                                        <button 
+                                        <button
                                             className="text-[10px] text-red-600 hover:underline font-normal"
                                             onClick={(e) => {
                                                 e.preventDefault()
@@ -346,22 +398,22 @@ export function DocumentsManagement({ users, publicDomain }: DocumentsManagement
                                     </div>
                                 </DropdownMenuLabel>
                                 {standardColumns.map(col => (
-                                    <DropdownMenuCheckboxItem 
-                                        key={col.id} 
-                                        checked={visibleColumns.has(col.id)} 
+                                    <DropdownMenuCheckboxItem
+                                        key={col.id}
+                                        checked={visibleColumns.has(col.id)}
                                         onCheckedChange={() => toggleColumn(col.id)}
                                     >
                                         {col.label}
                                     </DropdownMenuCheckboxItem>
                                 ))}
-                                
+
                                 {customFieldColumns.length > 0 && (
                                     <>
                                         <DropdownMenuSeparator />
                                         <DropdownMenuLabel className="flex items-center justify-between">
                                             Requirement Documents
                                             <div className="flex gap-2">
-                                                <button 
+                                                <button
                                                     className="text-[10px] text-blue-600 hover:underline font-normal"
                                                     onClick={(e) => {
                                                         e.preventDefault()
@@ -372,7 +424,7 @@ export function DocumentsManagement({ users, publicDomain }: DocumentsManagement
                                                 >
                                                     Select All
                                                 </button>
-                                                <button 
+                                                <button
                                                     className="text-[10px] text-red-600 hover:underline font-normal"
                                                     onClick={(e) => {
                                                         e.preventDefault()
@@ -386,9 +438,9 @@ export function DocumentsManagement({ users, publicDomain }: DocumentsManagement
                                             </div>
                                         </DropdownMenuLabel>
                                         {customFieldColumns.map(col => (
-                                            <DropdownMenuCheckboxItem 
-                                                key={col.id} 
-                                                checked={visibleColumns.has(col.id)} 
+                                            <DropdownMenuCheckboxItem
+                                                key={col.id}
+                                                checked={visibleColumns.has(col.id)}
                                                 onCheckedChange={() => toggleColumn(col.id)}
                                             >
                                                 {col.label}
@@ -399,9 +451,9 @@ export function DocumentsManagement({ users, publicDomain }: DocumentsManagement
                             </DropdownMenuContent>
                         </DropdownMenu>
 
-                        <Button 
-                            variant="default" 
-                            size="sm" 
+                        <Button
+                            variant="default"
+                            size="sm"
                             className="h-9 bg-green-600 hover:bg-green-700"
                             onClick={handleExport}
                             disabled={users.length === 0}
@@ -421,15 +473,15 @@ export function DocumentsManagement({ users, publicDomain }: DocumentsManagement
                                 <TableHead className="w-12 border-r"></TableHead>
                                 {(visibleColumns.has("usn") || visibleColumns.has("name") || visibleColumns.has("cgpa") || visibleColumns.has("status")) && (
                                     <TableHead colSpan={
-                                        (visibleColumns.has("usn") ? 1 : 0) + 
-                                        (visibleColumns.has("name") ? 1 : 0) + 
-                                        (visibleColumns.has("cgpa") ? 1 : 0) + 
+                                        (visibleColumns.has("usn") ? 1 : 0) +
+                                        (visibleColumns.has("name") ? 1 : 0) +
+                                        (visibleColumns.has("cgpa") ? 1 : 0) +
                                         (visibleColumns.has("status") ? 1 : 0)
                                     } className="text-center font-bold border-r bg-muted/5 uppercase text-[10px] tracking-wider">
                                         Basic Information
                                     </TableHead>
                                 )}
-                                
+
                                 {standardColumns.some(c => visibleColumns.has(c.id)) && (
                                     <TableHead colSpan={standardColumns.filter(c => visibleColumns.has(c.id)).length} className="text-center font-bold border-r bg-muted/5 uppercase text-[10px] tracking-wider">
                                         Standard Academic Documents
@@ -451,7 +503,7 @@ export function DocumentsManagement({ users, publicDomain }: DocumentsManagement
                             <TableRow className="bg-muted/5">
                                 <TableHead className="w-12 border-r text-center px-0">
                                     <div className="flex justify-center">
-                                        <Checkbox 
+                                        <Checkbox
                                             checked={selectedUserIds.size === users.length && users.length > 0}
                                             onCheckedChange={toggleSelectAllUsers}
                                         />
@@ -461,7 +513,7 @@ export function DocumentsManagement({ users, publicDomain }: DocumentsManagement
                                 {visibleColumns.has("name") && <TableHead className="border-r whitespace-nowrap">Student Name</TableHead>}
                                 {visibleColumns.has("cgpa") && <TableHead className="border-r whitespace-nowrap">CGPA</TableHead>}
                                 {visibleColumns.has("status") && <TableHead className="border-r whitespace-nowrap">KYC</TableHead>}
-                                
+
                                 {standardColumns.map(col => (
                                     visibleColumns.has(col.id) && (
                                         <TableHead key={col.id} className="whitespace-nowrap border-r text-xs">
@@ -469,7 +521,7 @@ export function DocumentsManagement({ users, publicDomain }: DocumentsManagement
                                         </TableHead>
                                     )
                                 ))}
-                                
+
                                 {customFieldColumns.map(col => (
                                     visibleColumns.has(col.id) && (
                                         <TableHead key={col.id} className="whitespace-nowrap border-r text-xs text-blue-700">
@@ -482,12 +534,12 @@ export function DocumentsManagement({ users, publicDomain }: DocumentsManagement
                         <TableBody>
                             {users.map((user) => {
                                 const doc = user.document
-                                
+
                                 return (
                                     <TableRow key={user.id} className={`${selectedUserIds.has(user.id) ? "bg-blue-50/30" : ""} hover:bg-muted/20 transition-colors`}>
                                         <TableCell className="border-r text-center px-0">
                                             <div className="flex justify-center">
-                                                <Checkbox 
+                                                <Checkbox
                                                     checked={selectedUserIds.has(user.id)}
                                                     onCheckedChange={() => toggleUserSelection(user.id)}
                                                 />
@@ -513,7 +565,7 @@ export function DocumentsManagement({ users, publicDomain }: DocumentsManagement
                                                 {getStatusBadge(doc?.kycStatus || "PENDING")}
                                             </TableCell>
                                         )}
-                                        
+
                                         {standardColumns.map(col => (
                                             visibleColumns.has(col.id) && (
                                                 <TableCell key={col.id} className="border-r">
@@ -524,7 +576,7 @@ export function DocumentsManagement({ users, publicDomain }: DocumentsManagement
 
                                         {customFieldColumns.map(col => {
                                             if (!visibleColumns.has(col.id)) return null
-                                            
+
                                             let value = null
                                             user.applications.forEach(app => {
                                                 if (app.job.companyName === col.company) {

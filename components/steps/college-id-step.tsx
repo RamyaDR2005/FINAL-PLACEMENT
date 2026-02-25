@@ -5,16 +5,18 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { DocumentUpload } from "@/components/ui/document-upload"
-import { AlertCircle, Upload, CheckCircle, ArrowLeft } from "lucide-react"
+import { AlertCircle, Upload, CheckCircle, ArrowLeft, Loader2 } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 interface CollegeIdStepProps {
   onNext: (data: any) => void
   onPrevious: () => void
+  onSave: (data: any) => void
+  isSaving?: boolean
   initialData?: any
 }
 
-export function CollegeIdStep({ onNext, onPrevious, initialData = {} }: CollegeIdStepProps) {
+export function CollegeIdStep({ onNext, onPrevious, onSave, isSaving, initialData = {} }: CollegeIdStepProps) {
   const [collegeIdCard, setCollegeIdCard] = useState<File | null>(null)
   const [uploadedUrl, setUploadedUrl] = useState<string | null>(initialData.collegeIdCard || null)
   const [isUploading, setIsUploading] = useState(false)
@@ -131,24 +133,28 @@ export function CollegeIdStep({ onNext, onPrevious, initialData = {} }: CollegeI
           </div>
         </div>
 
-        <div className="flex justify-between pt-4">
-          <Button variant="outline" onClick={onPrevious}>
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Previous
+        <div className="flex justify-between items-center pt-6">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onPrevious}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Previous Step
           </Button>
           <Button
             onClick={handleNext}
+            size="lg"
+            className="px-8 h-11 text-sm font-medium tracking-[-0.01em]"
             disabled={!uploadedUrl && !collegeIdCard || isUploading}
           >
-            {isUploading ? "Uploading..." : "Complete Profile"}
+            {isUploading ? "Uploading..." : "Next Step"}
           </Button>
         </div>
       </CardContent>
     </Card>
   )
 }
-
-
-
 
 

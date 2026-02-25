@@ -1,4 +1,5 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3"
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3"
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 
 // Cloudflare R2 configuration
 // Check if R2 is configured before initializing client
@@ -123,4 +124,55 @@ export async function deleteFromR2(key: string): Promise<void> {
 export function getFileTypeCategory(type: string): "image" | "document" {
   const imageTypes = ["profile-photo"]
   return imageTypes.includes(type) ? "image" : "document"
+}
+
+/**
+ * Generate a pre-signed URL for a file in R2
+ * This is used for temporary access to private files
+ */
+export async function getSignedUrlForFile(key: string, expiresIn: number = 3600): Promise<string> {
+  try {
+    if (!r2Client) {
+      throw new Error("Storage service is not configured")
+    }
+
+    const command = new GetObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+    })
+
+    // Generate a signed URL that expires in 1 hour by default
+    const signedUrl = await getSignedUrl(r2Client as any, command as any, { expiresIn })
+    return signedUrl
+  } catch (error) {
+    console.error("Error generating signed URL:", error)
+    throw new Error("Failed to generate access URL for the file")
+  }
+}
+
+/**
+ * Get a file from R2 as a stream
+ */
+export async function getFileFromR2(key: string) {
+  try {
+    if (!r2Client) {
+      throw new Error("Storage service is not configured")
+    }
+
+    const command = new GetObjectCommand({
+      Bucket: BUCKET_NAME,
+      Key: key,
+    })
+
+    const response = await r2Client.send(command)
+    return {
+      body: response.Body,
+      contentType: response.ContentType,
+      contentLength: response.ContentLength,
+      lastModified: response.LastModified,
+    }
+  } catch (error) {
+    console.error("Error getting file from R2:", error)
+    throw error
+  }
 }

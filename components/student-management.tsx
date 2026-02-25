@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { 
+import {
   Table,
   TableBody,
   TableCell,
@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { 
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -22,17 +22,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select"
-import { 
-  Search, 
-  Filter, 
-  Download, 
+import {
+  Search,
+  Filter,
+  Download,
   MoreHorizontal,
   Eye,
   Mail,
@@ -88,14 +88,14 @@ export function StudentManagement({ students, adminId }: StudentManagementProps)
 
   // Filter students based on search and filters
   const filteredStudents = students.filter(student => {
-    const matchesSearch = !searchTerm || 
+    const matchesSearch = !searchTerm ||
       student.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       student.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       student.profile?.usn?.toLowerCase().includes(searchTerm.toLowerCase())
 
     const matchesBranch = filterBranch === "all" || student.profile?.branch === filterBranch
-    
-    const matchesStatus = filterStatus === "all" || 
+
+    const matchesStatus = filterStatus === "all" ||
       (filterStatus === "complete" && student.profile?.isComplete) ||
       (filterStatus === "incomplete" && !student.profile?.isComplete) ||
       (filterStatus === "verified" && student.profile?.kycStatus === "VERIFIED") ||
@@ -204,7 +204,7 @@ export function StudentManagement({ students, adminId }: StudentManagementProps)
                 />
               </div>
             </div>
-            
+
             <Select value={filterBranch} onValueChange={setFilterBranch}>
               <SelectTrigger className="w-full md:w-48">
                 <SelectValue placeholder="Filter by branch" />
@@ -247,7 +247,6 @@ export function StudentManagement({ students, adminId }: StudentManagementProps)
                   <TableHead>Profile Status</TableHead>
                   <TableHead>KYC Status</TableHead>
                   <TableHead>Registered</TableHead>
-                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -306,31 +305,6 @@ export function StudentManagement({ students, adminId }: StudentManagementProps)
                       <span className="text-sm">
                         {format(new Date(student.createdAt), 'MMM dd, yyyy')}
                       </span>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem className="gap-2">
-                            <Eye className="w-4 h-4" />
-                            View Profile
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="gap-2">
-                            <Mail className="w-4 h-4" />
-                            Send Message
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="gap-2">
-                            <UserCheck className="w-4 h-4" />
-                            Verify KYC
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))}

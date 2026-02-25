@@ -15,13 +15,10 @@ export async function GET() {
       where: { userId: session.user.id }
     })
 
-    return NextResponse.json({ profile })
-  } catch (error) {
-    console.error("Error fetching profile:", error)
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    )
+    return NextResponse.json(profile)
+  } catch (error: any) {
+    console.error("Profile Save API Error:", error)
+    return NextResponse.json({ error: error.message || "Failed to update profile", details: error }, { status: 500 })
   }
 }
 
@@ -34,10 +31,11 @@ export async function PUT(request: NextRequest) {
       return error
     }
 
-    const data = await request.json()
+    const body = await request.json()
+    console.log("Profile PUT Body:", JSON.stringify(body, null, 2))
 
     // Prevent userId tampering - always use session userId
-    const sanitizedData = { ...data }
+    const sanitizedData = { ...body }
     delete sanitizedData.userId // Remove if present in payload
     delete sanitizedData.id // Prevent ID manipulation
 
@@ -165,24 +163,112 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    // Merge KYC status update with sanitized data
-    const updateData = {
-      ...sanitizedData,
-      ...kycStatusUpdate,
-      updatedAt: new Date()
-    }
+    // Whitelist of all valid Prisma Profile schema fields (strip anything else to prevent "Unknown argument" errors)
+    const validProfileFields = new Set([
+      'isComplete', 'completionStep',
+      'firstName', 'middleName', 'lastName', 'dateOfBirth', 'dobDay', 'dobMonth', 'dobYear',
+      'gender', 'bloodGroup', 'state', 'stateOfDomicile', 'nationality', 'category', 'casteCategory',
+      'profilePhoto', 'email', 'studentEmail',
+      'callingMobile', 'callingNumber', 'whatsappMobile', 'whatsappNumber', 'alternativeMobile', 'altNumber',
+      'fatherFirstName', 'fatherMiddleName', 'fatherLastName', 'fatherName', 'fatherDeceased',
+      'fatherMobile', 'fatherEmail', 'fatherOccupation',
+      'motherFirstName', 'motherMiddleName', 'motherLastName', 'motherName', 'motherDeceased',
+      'motherMobile', 'motherEmail', 'motherOccupation',
+      'currentHouse', 'currentCross', 'currentArea', 'currentDistrict', 'currentCity',
+      'currentState', 'currentPincode', 'currentAddress', 'sameAsCurrent',
+      'permanentHouse', 'permanentCross', 'permanentArea', 'permanentDistrict', 'permanentCity',
+      'permanentState', 'permanentPincode', 'permanentAddress', 'country',
+      'tenthSchool', 'tenthSchoolName', 'tenthArea', 'tenthAreaDistrictCity', 'tenthDistrict',
+      'tenthCity', 'tenthPincode', 'tenthState', 'tenthBoard', 'tenthPassingYear', 'tenthPassingMonth',
+      'tenthMarksType', 'tenthPercentage', 'tenthSubjects', 'tenthTotalMarks', 'tenthMarksOutOf1000',
+      'tenthMarksCard',
+      'academicLevel', 'hasCompletedTwelfth',
+      'twelfthSchool', 'twelfthSchoolName', 'twelfthArea', 'twelfthAreaDistrictCity', 'twelfthDistrict',
+      'twelfthCity', 'twelfthPincode', 'twelfthState', 'twelfthBoard', 'twelfthPassingYear', 'twelfthPassingMonth',
+      'twelfthMarksType', 'twelfthPercentage', 'twelfthSubjects', 'twelfthTotalMarks', 'twelfthMarksOutOf1000',
+      'twelfthMarksCard', 'twelfthCbseSubjects', 'twelfthCbseMarks', 'twelfthIcseMarks',
+      'hasCompletedDiploma', 'diplomaCollege', 'diplomaCollegeName', 'diplomaArea', 'diplomaAreaLocation',
+      'diplomaDistrict', 'diplomaCity', 'diplomaPincode', 'diplomaState',
+      'diplomaCertificate', 'diplomaCertificates', 'diplomaSemesterSgpa', 'diplomaSemesters',
+      'diplomaYearMarks', 'diplomaFirstYear', 'diplomaSecondYear', 'diplomaThirdYear', 'diplomaPercentage',
+      'collegeName', 'collegeDistrict', 'district', 'collegePincode', 'pincode',
+      'branch', 'entryType', 'seatCategory', 'usn', 'libraryId',
+      'residencyStatus', 'hostelName', 'hostelRoom', 'roomNumber', 'hostelFloor', 'floorNumber',
+      'city', 'localCity', 'transportMode', 'busRoute',
+      'batch', 'branchMentor', 'linkedinLink', 'githubLink', 'leetcodeLink',
+      'resumeUpload', 'semesters', 'semesterRecords', 'semesterMarksCards',
+      'failedSubjects', 'clearedAfterFailure', 'finalCgpa', 'hasBacklogs', 'activeBacklogs',
+      'backlogs', 'backlogSubjects',
+      'linkedin', 'github', 'leetcode', 'portfolio', 'codechef', 'codeforces', 'hackerrank',
+      'resume', 'phone', 'alternatePhone', 'department', 'course', 'specialization',
+      'semester', 'year', 'cgpa', 'percentage',
+      'guardianName', 'guardianPhone', 'guardianRelation',
+      'skills', 'certifications', 'projects', 'internships', 'achievements', 'hobbies', 'languages',
+      'expectedSalary', 'preferredLocations', 'jobType', 'workMode',
+      'kycStatus', 'verifiedBy', 'verifiedAt', 'remarks',
+      'createdAt', 'collegeIdCard', 'academicDocument',
+    ])
 
-    console.log("Updating profile with data:", JSON.stringify(updateData, null, 2))
+    // Strip any fields not in the Prisma schema whitelist
+    Object.keys(sanitizedData).forEach(key => {
+      if (!validProfileFields.has(key)) {
+        delete sanitizedData[key]
+      }
+    })
+
+    // Convert empty strings to null and perform type casting for specific fields
+    const numericFields = ['tenthPassingYear', 'tenthPercentage', 'twelfthPassingYear', 'twelfthPercentage', 'diplomaPercentage', 'finalCgpa', 'completionStep']
+    const dateFields = ['dateOfBirth']
+    const enumFields = ['gender', 'bloodGroup', 'tenthBoard', 'twelfthBoard', 'branch', 'entryType', 'seatCategory', 'kycStatus']
+
+    Object.keys(sanitizedData).forEach(key => {
+      const value = sanitizedData[key]
+
+      // Handle empty strings for optional fields
+      if (value === "") {
+        sanitizedData[key] = null
+        return
+      }
+
+      // Convert to Number
+      if (numericFields.includes(key) && value !== null) {
+        const num = parseFloat(value)
+        sanitizedData[key] = isNaN(num) ? null : num
+        return
+      }
+
+      // Convert to Date
+      if (dateFields.includes(key) && value !== null) {
+        try {
+          const date = new Date(value)
+          sanitizedData[key] = isNaN(date.getTime()) ? null : date
+        } catch {
+          sanitizedData[key] = null
+        }
+        return
+      }
+
+      // Handle Enums (ensure null if invalid/empty)
+      if (enumFields.includes(key) && value === null) {
+        // Keep as null
+        return
+      }
+    })
+
+    console.log("Updating profile with data:", JSON.stringify(sanitizedData, null, 2))
 
     let profile
     if (existingProfile) {
       // Update existing profile - ensure user can only update their own profile
-      // Allow updates regardless of current KYC status
       profile = await prisma.profile.update({
         where: {
-          userId: session.user.id // Always use session userId
+          userId: session.user.id
         },
-        data: updateData
+        data: {
+          ...sanitizedData,
+          ...kycStatusUpdate,
+          updatedAt: new Date()
+        }
       })
 
       logSecurityEvent("profile_updated", {
@@ -195,8 +281,11 @@ export async function PUT(request: NextRequest) {
       // Create new profile
       profile = await prisma.profile.create({
         data: {
+          ...sanitizedData,
           userId: session.user.id, // Always use session userId
-          ...updateData,
+          ...kycStatusUpdate,
+          createdAt: new Date(),
+          updatedAt: new Date()
         }
       })
 

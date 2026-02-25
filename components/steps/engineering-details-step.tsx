@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { DatePicker } from "@/components/ui/date-picker"
 import { DocumentUpload } from "@/components/ui/document-upload"
-import { ArrowLeft, AlertCircle, Plus, Trash2, Upload } from "lucide-react"
+import { ArrowLeft, AlertCircle, Plus, Trash2, Upload, Loader2 } from "lucide-react"
 
 interface SemesterData {
   semester: number
@@ -54,10 +54,12 @@ interface EngineeringFormData {
 interface EngineeringDetailsStepProps {
   onNext: (data: EngineeringFormData) => void
   onPrevious: () => void
+  onSave: (data: any) => void
+  isSaving?: boolean
   initialData?: Partial<EngineeringFormData>
 }
 
-export function EngineeringDetailsStep({ onNext, onPrevious, initialData = {} }: EngineeringDetailsStepProps) {
+export function EngineeringDetailsStep({ onNext, onPrevious, onSave, isSaving, initialData = {} }: EngineeringDetailsStepProps) {
   const [formData, setFormData] = useState<EngineeringFormData>({
     collegeName: "SHRI DHARMASTHALA MANJUNATHESHWARA COLLEGE OF ENGINEERING AND TECHNOLOGY",
     district: "DHARWAD",
@@ -68,7 +70,7 @@ export function EngineeringDetailsStep({ onNext, onPrevious, initialData = {} }:
     gender: initialData.gender || "",
     usn: initialData.usn || "",
     libraryId: initialData.libraryId || "",
-    batch: "2022 - 2026",
+    batch: initialData.batch || "",
     branchMentor: initialData.branchMentor || "",
     linkedinLink: initialData.linkedinLink || "",
     githubLink: initialData.githubLink || "",
@@ -218,30 +220,22 @@ export function EngineeringDetailsStep({ onNext, onPrevious, initialData = {} }:
   const validateUSN = (usn: string, entryType: string, branch: string) => {
     if (!entryType || !branch) return false
 
-    const validBranches = ["ME", "CE", "EEE", "ECE", "AIML", "CSE", "ISE"]
-    if (!validBranches.includes(branch)) return false
-
-    // Map branch codes for USN validation (USN uses different codes)
+    // Map branch codes for USN (USN uses different codes than branch selector)
     const usnBranchMap: Record<string, string> = {
-      "ME": "ME",
-      "CE": "CV",
-      "EEE": "EE",
-      "ECE": "EC",
-      "AIML": "AI",
-      "CSE": "CS",
-      "ISE": "IS"
+      "ME": "ME", "CE": "CV", "EEE": "EE", "ECE": "EC",
+      "AIML": "AI", "CSE": "CS", "ISE": "IS", "DS": "DS"
     }
-
     const usnBranchCode = usnBranchMap[branch]
+    if (!usnBranchCode) return false
 
     if (entryType === "REGULAR") {
-      const regex = new RegExp(`^2SD22${usnBranchCode}\\d{3}$`)
-      const number = Number.parseInt(usn.slice(-3))
-      return regex.test(usn) && number >= 1 && number <= 150
+      // Format: 2SD[YY][BRANCH][3-digits], e.g. 2SD22CS001
+      const regex = new RegExp(`^2SD\\d{2}${usnBranchCode}\\d{3}$`)
+      return regex.test(usn)
     } else if (entryType === "LATERAL") {
-      const regex = new RegExp(`^2SD23${usnBranchCode}\\d{3}$`)
-      const number = Number.parseInt(usn.slice(-3))
-      return regex.test(usn) && number >= 400 && number <= 430
+      // Format: 2SD[YY][BRANCH][3-digits], e.g. 2SD23CS400
+      const regex = new RegExp(`^2SD\\d{2}${usnBranchCode}\\d{3}$`)
+      return regex.test(usn)
     }
 
     return false
@@ -251,12 +245,19 @@ export function EngineeringDetailsStep({ onNext, onPrevious, initialData = {} }:
     if (!entryType) return false
 
     if (entryType === "REGULAR") {
-      return /^22BE\d{4}$/.test(libraryId)
+      // Format: [YY]BE[4-digit], e.g. 22BE1234
+      return /^\d{2}BE\d{4}$/.test(libraryId)
     } else if (entryType === "LATERAL") {
-      return /^DIP23BE\d{3}$/.test(libraryId)
+      // Format: DIP[YY]BE[3-digit], e.g. DIP23BE123
+      return /^DIP\d{2}BE\d{3}$/.test(libraryId)
     }
 
     return false
+  }
+
+  const validateBatch = (batch: string) => {
+    // Accepts formats like: 2022-2026, 2022 - 2026
+    return /^\d{4}\s*-\s*\d{4}$/.test(batch.trim())
   }
 
   const validateForm = () => {
@@ -268,18 +269,27 @@ export function EngineeringDetailsStep({ onNext, onPrevious, initialData = {} }:
     if (!formData.seatCategory) newErrors.seatCategory = "Seat category is required"
     if (!formData.gender) newErrors.gender = "Gender is required"
 
+    // Batch validation
+    if (!formData.batch.trim()) {
+      newErrors.batch = "Batch is required"
+    } else if (!validateBatch(formData.batch)) {
+      newErrors.batch = "Enter batch in format YYYY-YYYY (e.g., 2022-2026)"
+    }
+
     // USN validation
     if (!formData.usn.trim()) {
       newErrors.usn = "USN is required"
-    } else if (!validateUSN(formData.usn, formData.entryType, formData.branch)) {
-      newErrors.usn = "Invalid USN format"
+    } else if (!validateUSN(formData.usn.toUpperCase(), formData.entryType, formData.branch)) {
+      newErrors.usn = "Invalid USN. Expected format: 2SD[YY][BRANCH][3-digits] e.g. 2SD22CS001"
     }
 
     // Library ID validation
     if (!formData.libraryId.trim()) {
       newErrors.libraryId = "Library ID is required"
-    } else if (!validateLibraryId(formData.libraryId, formData.entryType)) {
-      newErrors.libraryId = "Invalid Library ID format"
+    } else if (!validateLibraryId(formData.libraryId.toUpperCase(), formData.entryType)) {
+      newErrors.libraryId = formData.entryType === "REGULAR"
+        ? "Invalid Library ID. Expected format: [YY]BE[4-digit] e.g. 22BE1234"
+        : "Invalid Library ID. Expected format: DIP[YY]BE[3-digit] e.g. DIP23BE123"
     }
 
     // Other validations
@@ -290,20 +300,13 @@ export function EngineeringDetailsStep({ onNext, onPrevious, initialData = {} }:
       newErrors.linkedinLink = "Enter a valid LinkedIn URL (e.g., https://linkedin.com/in/username)"
     }
 
-    // GitHub and LeetCode for specific branches
-    const techBranches = ["CSE", "ISE", "AIML"]
-    if (techBranches.includes(formData.branch)) {
-      if (!formData.githubLink.trim()) {
-        newErrors.githubLink = "GitHub profile is required for your branch"
-      } else if (!/^https?:\/\/(www\.)?github\.com\/[\w-]+/.test(formData.githubLink)) {
-        newErrors.githubLink = "Enter a valid GitHub URL (e.g., https://github.com/username)"
-      }
+    // GitHub and LeetCode are optional for all branches - only validate format if provided
+    if (formData.githubLink.trim() && !/^https?:\/\/(www\.)?github\.com\/[\w-]+/.test(formData.githubLink)) {
+      newErrors.githubLink = "Enter a valid GitHub URL (e.g., https://github.com/username)"
+    }
 
-      if (!formData.leetcodeLink.trim()) {
-        newErrors.leetcodeLink = "LeetCode profile is required for your branch"
-      } else if (!/^https?:\/\/(www\.)?leetcode\.com\/(u\/)?[\w-]+/.test(formData.leetcodeLink)) {
-        newErrors.leetcodeLink = "Enter a valid LeetCode URL (e.g., https://leetcode.com/username)"
-      }
+    if (formData.leetcodeLink.trim() && !/^https?:\/\/(www\.)?leetcode\.com\/(u\/)?[\w-]+/.test(formData.leetcodeLink)) {
+      newErrors.leetcodeLink = "Enter a valid LeetCode URL (e.g., https://leetcode.com/username)"
     }
 
     if (!formData.resumeUpload) newErrors.resumeUpload = "Resume upload is required"
@@ -455,7 +458,7 @@ export function EngineeringDetailsStep({ onNext, onPrevious, initialData = {} }:
               />
               {errors.usn && <p className="text-sm text-red-500 mt-1">{errors.usn}</p>}
               <p className="text-xs text-muted-foreground mt-1">
-                Format: 2SD22[BRANCH][001-150] for Regular, 2SD23[BRANCH][400-430] for Lateral
+                Format: 2SD[YY][BRANCH][3-digits] — e.g. 2SD22ME001 (Regular) or 2SD23CS400 (Lateral)
               </p>
             </div>
 
@@ -470,7 +473,7 @@ export function EngineeringDetailsStep({ onNext, onPrevious, initialData = {} }:
               />
               {errors.libraryId && <p className="text-sm text-red-500 mt-1">{errors.libraryId}</p>}
               <p className="text-xs text-muted-foreground mt-1">
-                Format: 22BE[4-digit] for Regular, DIP23BE[3-digit] for Lateral
+                Format: [YY]BE[4-digits] for Regular (e.g. 22BE1234), DIP[YY]BE[3-digits] for Lateral (e.g. DIP23BE123)
               </p>
             </div>
           </CardContent>
@@ -484,8 +487,16 @@ export function EngineeringDetailsStep({ onNext, onPrevious, initialData = {} }:
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label>Batch</Label>
-              <Input value={formData.batch} className="bg-muted w-full" readOnly />
+              <Label htmlFor="batch">Batch *</Label>
+              <Input
+                id="batch"
+                value={formData.batch}
+                onChange={(e) => handleInputChange("batch", e.target.value)}
+                className={`w-full ${errors.batch ? "border-red-500" : ""}`}
+                placeholder="e.g., 2022-2026"
+              />
+              {errors.batch && <p className="text-sm text-red-500 mt-1">{errors.batch}</p>}
+              <p className="text-xs text-muted-foreground mt-1">Enter your joining year to passing year (e.g., 2022-2026)</p>
             </div>
 
             <div>
@@ -513,37 +524,33 @@ export function EngineeringDetailsStep({ onNext, onPrevious, initialData = {} }:
               {errors.linkedinLink && <p className="text-sm text-red-500 mt-1">{errors.linkedinLink}</p>}
             </div>
 
-            {["CSE", "ISE", "AIML"].includes(formData.branch) && (
-              <>
-                <div>
-                  <Label htmlFor="githubLink">GitHub Profile Link *</Label>
-                  <Input
-                    id="githubLink"
-                    type="url"
-                    value={formData.githubLink}
-                    onChange={(e) => handleInputChange("githubLink", e.target.value)}
-                    className={`w-full ${errors.githubLink ? "border-red-500" : ""}`}
-                    placeholder="https://github.com/yourprofile"
-                  />
-                  {errors.githubLink && <p className="text-sm text-red-500 mt-1">{errors.githubLink}</p>}
-                  <p className="text-xs text-muted-foreground mt-1">Mandatory for ISE, CSE, AIML students</p>
-                </div>
+            <div>
+              <Label htmlFor="githubLink">GitHub Profile Link</Label>
+              <Input
+                id="githubLink"
+                type="url"
+                value={formData.githubLink}
+                onChange={(e) => handleInputChange("githubLink", e.target.value)}
+                className={`w-full ${errors.githubLink ? "border-red-500" : ""}`}
+                placeholder="https://github.com/yourprofile"
+              />
+              {errors.githubLink && <p className="text-sm text-red-500 mt-1">{errors.githubLink}</p>}
+              <p className="text-xs text-muted-foreground mt-1">Optional — Add your GitHub profile link</p>
+            </div>
 
-                <div>
-                  <Label htmlFor="leetcodeLink">LeetCode Profile Link *</Label>
-                  <Input
-                    id="leetcodeLink"
-                    type="url"
-                    value={formData.leetcodeLink}
-                    onChange={(e) => handleInputChange("leetcodeLink", e.target.value)}
-                    className={`w-full ${errors.leetcodeLink ? "border-red-500" : ""}`}
-                    placeholder="https://leetcode.com/yourprofile/"
-                  />
-                  {errors.leetcodeLink && <p className="text-sm text-red-500 mt-1">{errors.leetcodeLink}</p>}
-                  <p className="text-xs text-muted-foreground mt-1">Mandatory for ISE, CSE, AIML students</p>
-                </div>
-              </>
-            )}
+            <div>
+              <Label htmlFor="leetcodeLink">LeetCode Profile Link</Label>
+              <Input
+                id="leetcodeLink"
+                type="url"
+                value={formData.leetcodeLink}
+                onChange={(e) => handleInputChange("leetcodeLink", e.target.value)}
+                className={`w-full ${errors.leetcodeLink ? "border-red-500" : ""}`}
+                placeholder="https://leetcode.com/yourprofile/"
+              />
+              {errors.leetcodeLink && <p className="text-sm text-red-500 mt-1">{errors.leetcodeLink}</p>}
+              <p className="text-xs text-muted-foreground mt-1">Optional — Add your LeetCode profile link</p>
+            </div>
 
             <DocumentUpload
               onFileChange={(file) => handleFileUpload("resumeUpload", file)}
@@ -763,12 +770,12 @@ export function EngineeringDetailsStep({ onNext, onPrevious, initialData = {} }:
           </CardContent>
         </Card>
 
-        <div className="flex justify-between pt-4">
+        <div className="flex justify-between items-center pt-6">
           <Button type="button" variant="outline" onClick={onPrevious} className="flex items-center gap-2">
             <ArrowLeft className="w-4 h-4" />
             Previous
           </Button>
-          <Button type="submit" size="lg" className="px-8 py-3">
+          <Button type="submit" size="lg" className="px-8 h-11 text-sm font-medium tracking-[-0.01em]">
             Next Step
           </Button>
         </div>
