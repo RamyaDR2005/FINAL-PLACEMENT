@@ -121,9 +121,6 @@ export async function POST(request: NextRequest) {
                 where: { id: session.user.id },
                 include: {
                     profile: true,
-                    placements: {
-                        where: { isException: false }
-                    }
                 }
             })
         ])
@@ -166,14 +163,8 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "You have already applied for this job" }, { status: 400 })
         }
 
-        // 5. Tier Eligibility Check
-        let highestTierPlacement: string | null = null
-        const tierOrder = ["TIER_1", "TIER_2", "TIER_3", "DREAM"]
-        for (const p of user.placements) {
-            if (!highestTierPlacement || tierOrder.indexOf(p.tier) < tierOrder.indexOf(highestTierPlacement)) {
-                highestTierPlacement = p.tier
-            }
-        }
+        // 5. Tier Eligibility Check - use profile's highestPlacementTier
+        const highestTierPlacement = user.profile.highestPlacementTier
 
         const tierCheck = canApplyToTier(highestTierPlacement, job.tier, job.isDreamOffer)
         if (!tierCheck.eligible) {

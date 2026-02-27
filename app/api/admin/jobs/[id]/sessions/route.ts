@@ -48,7 +48,7 @@ export async function POST(
         if (error || !session) return error
 
         const { id: jobId } = await params
-        const { roundId } = await request.json()
+        const { roundId, startTime, duration } = await request.json()
 
         if (!roundId) {
             return NextResponse.json({ error: "roundId is required" }, { status: 400 })
@@ -87,11 +87,21 @@ export async function POST(
             )
         }
 
+        // Calculate start and end times
+        const sessionStartTime = startTime ? new Date(startTime) : new Date()
+        let sessionEndTime: Date | null = null
+        
+        if (duration && duration > 0) {
+            sessionEndTime = new Date(sessionStartTime.getTime() + duration * 60 * 1000)
+        }
+
         const driveSession = await prisma.driveSession.create({
             data: {
                 jobId,
                 roundId,
                 status: "ACTIVE",
+                startTime: sessionStartTime,
+                endTime: sessionEndTime,
                 createdBy: session.user.id,
             },
             include: {

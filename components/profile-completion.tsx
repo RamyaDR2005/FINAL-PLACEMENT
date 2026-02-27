@@ -329,6 +329,7 @@ export function ProfileCompletion({ profile, userEmail }: { profile: any, userEm
                     <ReviewStep
                         onPrevious={handlePrevious}
                         formData={formData}
+                        profile={profile}
                     />
                 )
             default:

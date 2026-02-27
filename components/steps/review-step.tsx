@@ -12,9 +12,10 @@ import { toast } from "sonner"
 interface ReviewStepProps {
   onPrevious: () => void
   formData: any
+  profile?: any // Actual profile data from database
 }
 
-export function ReviewStep({ onPrevious, formData }: ReviewStepProps) {
+export function ReviewStep({ onPrevious, formData, profile }: ReviewStepProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isDownloading, setIsDownloading] = useState(false)
 
@@ -169,7 +170,8 @@ export function ReviewStep({ onPrevious, formData }: ReviewStepProps) {
 
         // Completion flags
         isComplete: true,
-        kycStatus: "PENDING",
+        // Don't reset kycStatus if already VERIFIED or REJECTED (admin-set statuses)
+        ...((profile?.kycStatus !== 'VERIFIED' && profile?.kycStatus !== 'REJECTED') ? { kycStatus: "PENDING" } : {}),
         completionStep: 6,
       }
 
@@ -192,10 +194,17 @@ export function ReviewStep({ onPrevious, formData }: ReviewStepProps) {
         throw new Error(errorData.error || "Failed to submit profile")
       }
 
-      toast.success("Profile submitted successfully! Your KYC verification is pending.", {
-        duration: 5000,
-        description: "Please visit the Placement Cell with your documents."
-      })
+      // Show appropriate message based on KYC status
+      if (profile?.kycStatus === 'VERIFIED') {
+        toast.success("Profile updated successfully! Your KYC is already verified.", {
+          duration: 3000,
+        })
+      } else {
+        toast.success("Profile submitted successfully! Your KYC verification is pending.", {
+          duration: 5000,
+          description: "Please visit the Placement Cell with your documents."
+        })
+      }
 
       // Redirect to dashboard after 2 seconds
       setTimeout(() => {
@@ -236,13 +245,25 @@ export function ReviewStep({ onPrevious, formData }: ReviewStepProps) {
   const engineeringDetails = formData?.engineeringDetails || {}
   const engineeringAcademicDetails = formData?.engineeringAcademicDetails || {}
 
+  // Derive KYC status for display
+  const currentKycStatus = profile?.kycStatus || 'PENDING'
+  const isKycVerified = currentKycStatus === 'VERIFIED'
+
   return (
     <div className="max-w-4xl mx-auto">
       <div className="space-y-8">
         {/* Submission Notice */}
-        <p className="text-sm text-muted-foreground">
-          Your KYC verification is pending. Please visit the Placement Cell with all submitted documents for verification.
-        </p>
+        {isKycVerified ? (
+          <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+            <p className="text-sm text-green-700 dark:text-green-300 font-medium">
+              ✅ Your KYC is verified! You can now apply for jobs.
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Your KYC verification is pending. Please visit the Placement Cell with all submitted documents for verification.
+          </p>
+        )}
 
         {/* Personal Information Summary */}
         <Card>

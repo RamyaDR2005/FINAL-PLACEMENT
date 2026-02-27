@@ -12,7 +12,9 @@ import {
   Building,
   Briefcase,
   LogOut,
-  FileText
+  FileText,
+  ScanLine,
+  ClipboardCheck,
 } from "lucide-react"
 import { signOut } from "next-auth/react"
 
@@ -52,6 +54,16 @@ const navigationItems = [
     title: "Companies",
     url: "/admin/companies",
     icon: Building,
+  },
+  {
+    title: "Manage Rounds",
+    url: "/admin/manage-rounds",
+    icon: ScanLine,
+  },
+  {
+    title: "KYC Queue",
+    url: "/admin/kyc-queue",
+    icon: ClipboardCheck,
   },
   {
     title: "Schedule",

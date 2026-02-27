@@ -115,7 +115,8 @@ export default function JobDetailPage() {
 
                 if (profileResponse.ok) {
                     const profileData = await profileResponse.json()
-                    setProfile(profileData.profile || {})
+                    // API returns profile directly, not wrapped in { profile: ... }
+                    setProfile(profileData || {})
                 }
             } catch (error) {
                 console.error("Error fetching data:", error)

@@ -13,7 +13,7 @@ function determineTier(salary: number | null, isDreamOffer: boolean): string {
 }
 
 // Helper to notify eligible students about new job
-async function notifyEligibleStudents(jobId: string, jobTitle: string, companyName: string, allowedBranches: string[] | null, salary: number | null) {
+async function notifyEligibleStudents(jobId: string, jobTitle: string, companyName: string, allowedBranches: string[] | null, salary: string | null) {
     try {
         // Get eligible students (with verified KYC and matching branch)
         // If allowedBranches is null or empty, it means ALL branches are allowed
@@ -49,7 +49,7 @@ async function notifyEligibleStudents(jobId: string, jobTitle: string, companyNa
                 type: "JOB_POSTED" as const,
                 data: {
                     jobId,
-                    salary: salary ? `${salary} LPA` : "Not Disclosed",
+                    salary: salary || "Not Disclosed",
                     eligibility: allowedBranches && allowedBranches.length > 0 ? allowedBranches.join(", ") : "All Branches",
                     companyName,
                     jobTitle,
@@ -195,7 +195,7 @@ export async function POST(request: NextRequest) {
             allowedBranches: data.allowedBranches || [],
             eligibleBatch: data.eligibleBatch ? sanitizeInput(data.eligibleBatch) : null,
             maxBacklogs: (data.maxBacklogs !== undefined && data.maxBacklogs !== null) ? parseInt(data.maxBacklogs) : null,
-            salary: data.salary ? Math.round(parseFloat(data.salary.toString().replace(/[^0-9.]/g, '')) || 0) : null,
+            salary: data.salary ? String(data.salary) : null,
             minSalary: data.minSalary ? parseFloat(data.minSalary) : null,
             maxSalary: maxSalary,
             companyLogo: data.companyLogo || null,
@@ -306,7 +306,7 @@ export async function PUT(request: NextRequest) {
         if (updateData.allowedBranches !== undefined) sanitizedData.allowedBranches = updateData.allowedBranches || []
         if (updateData.eligibleBatch !== undefined) sanitizedData.eligibleBatch = updateData.eligibleBatch ? sanitizeInput(updateData.eligibleBatch) : null
         if (updateData.maxBacklogs !== undefined) sanitizedData.maxBacklogs = (updateData.maxBacklogs !== null) ? parseInt(updateData.maxBacklogs) : null
-        if (updateData.salary !== undefined) sanitizedData.salary = updateData.salary ? Math.round(parseFloat(updateData.salary.toString().replace(/[^0-9.]/g, '')) || 0) : null
+        if (updateData.salary !== undefined) sanitizedData.salary = updateData.salary ? String(updateData.salary) : null
         if (updateData.minSalary !== undefined) sanitizedData.minSalary = updateData.minSalary ? parseFloat(updateData.minSalary) : null
         if (updateData.maxSalary !== undefined) sanitizedData.maxSalary = updateData.maxSalary ? parseFloat(updateData.maxSalary) : null
         if (updateData.companyLogo !== undefined) sanitizedData.companyLogo = updateData.companyLogo

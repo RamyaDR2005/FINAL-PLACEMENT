@@ -57,6 +57,7 @@ model User {
   createdEvents     ScheduleEvent[]    @relation("CreatedEvents")
   sessions          Session[]
   roundAttendances  RoundAttendance[]
+  finalSelections   FinalSelected[]
 
   @@map("users")
 }
@@ -269,6 +270,9 @@ model Profile {
   verifiedBy              String?            @map("verified_by")
   verifiedAt              DateTime?          @map("verified_at")
   remarks                 String?
+  // Placement tracking
+  highestPlacementTier    PlacementTier?     @map("highest_placement_tier") // Tracks highest tier placed in
+  placedAt                DateTime?          @map("placed_at") // When first placed
   createdAt               DateTime           @default(now()) @map("created_at")
   updatedAt               DateTime           @updatedAt @map("updated_at")
   collegeIdCard           String?            @map("college_id_card")
@@ -349,7 +353,7 @@ model Job {
   maxBacklogs     Int?          @default(0) @map("max_backlogs")
 
   // Salary Information
-  salary          Float? // In LPA
+  salary          String? // Display string like "8-12 LPA"
   minSalary       Float?        @map("min_salary")
   maxSalary       Float?        @map("max_salary")
 
@@ -377,6 +381,7 @@ model Job {
   rounds           JobRound[]
   driveSessions    DriveSession[]
   roundAttendances RoundAttendance[]
+  finalSelections  FinalSelected[]
 
   // Schedule events linked to this job
   scheduleEvents   ScheduleEvent[]
@@ -531,6 +536,32 @@ model RoundAttendance {
   @@map("round_attendances")
 }
 
+// Final selected students for a job (auto-created when PASSED in final round, or manual override)
+model FinalSelected {
+  id         String        @id @default(cuid())
+  userId     String        @map("user_id")
+  jobId      String        @map("job_id")
+  usn        String?       // Snapshot at time of selection
+  year       String?       // Batch year (e.g., "2022-2026")
+  tier       PlacementTier @default(TIER_3)
+  package    Float?        // CTC in LPA
+  role       String?       // Job role/title
+  isManual   Boolean       @default(false) @map("is_manual") // True if admin manually added
+  selectedAt DateTime      @default(now()) @map("selected_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job  Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, jobId]) // One selection per student per job
+  @@index([userId])
+  @@index([jobId])
+  @@index([year])
+  @@map("final_selections")
+}
+
 model Company {
   id          String   @id @default(cuid())
   name        String   @unique
@@ -649,6 +680,14 @@ enum CasteCategory {
   OBC
   SC
   ST
+  EWS
+  CAT_1
+  CAT_2A
+  CAT_2B
+  CAT_3A
+  CAT_3B
+  GM
+  OTHER
 }
 
 enum Board {

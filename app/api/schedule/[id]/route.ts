@@ -41,7 +41,7 @@ export async function PUT(
     if (eventDateTime) updateData.date = eventDateTime
     if (duration) updateData.duration = duration
     if (location !== undefined) updateData.location = location
-    if (type) updateData.type = type.toUpperCase()
+    if (type) updateData.type = type.toUpperCase().replace(/-/g, '_')
     if (company !== undefined) updateData.company = company
     if (maxAttendees) updateData.maxAttendees = maxAttendees
     if (isVisible !== undefined) updateData.isVisible = isVisible

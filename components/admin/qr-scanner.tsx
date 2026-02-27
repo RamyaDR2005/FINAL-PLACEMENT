@@ -1,10 +1,10 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
-import { Camera, CameraOff, CheckCircle, XCircle, User, Building2 } from "lucide-react"
+import { Camera, CameraOff } from "lucide-react"
+import jsQR from "jsqr"
 
 interface QRScannerProps {
     onScan: (data: string) => void
@@ -14,26 +14,53 @@ interface QRScannerProps {
 export function QRScanner({ onScan, isProcessing = false }: QRScannerProps) {
     const [isActive, setIsActive] = useState(false)
     const [hasPermission, setHasPermission] = useState<boolean | null>(null)
+    const [lastScanned, setLastScanned] = useState<string | null>(null)
     const videoRef = useRef<HTMLVideoElement>(null)
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const streamRef = useRef<MediaStream | null>(null)
-    const scanIntervalRef = useRef<NodeJS.Timeout | null>(null)
+    const scanningRef = useRef(false)
 
     const startCamera = async () => {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: "environment" }
-            })
+            console.log("Starting camera...")
+            
+            // Try to get the back camera first
+            let stream: MediaStream
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { 
+                        facingMode: { ideal: "environment" },
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                })
+            } catch (e) {
+                console.log("Back camera failed, trying any camera:", e)
+                // Fall back to any available camera
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: true
+                })
+            }
+
+            console.log("Got stream:", stream)
             streamRef.current = stream
+            setHasPermission(true)
 
             if (videoRef.current) {
                 videoRef.current.srcObject = stream
-                await videoRef.current.play()
+                
+                // Use a promise-based approach for play
+                try {
+                    await videoRef.current.play()
+                    console.log("Video playing")
+                    setIsActive(true)
+                    scanningRef.current = true
+                    requestAnimationFrame(scanFrame)
+                } catch (playError) {
+                    console.error("Play error:", playError)
+                    toast.error("Could not start video playback")
+                }
             }
-
-            setIsActive(true)
-            setHasPermission(true)
-            startScanning()
         } catch (error) {
             console.error("Camera error:", error)
             setHasPermission(false)
@@ -41,40 +68,72 @@ export function QRScanner({ onScan, isProcessing = false }: QRScannerProps) {
         }
     }
 
+    const scanFrame = () => {
+        if (!scanningRef.current || !videoRef.current || !canvasRef.current) {
+            return
+        }
+
+        const video = videoRef.current
+        const canvas = canvasRef.current
+        const context = canvas.getContext('2d', { willReadFrequently: true })
+
+        if (context && video.readyState === video.HAVE_ENOUGH_DATA) {
+            canvas.height = video.videoHeight
+            canvas.width = video.videoWidth
+            context.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+            try {
+                const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+                const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                    inversionAttempts: "dontInvert",
+                })
+
+                if (code && code.data && !isProcessing) {
+                    // Prevent duplicate scans
+                    if (lastScanned !== code.data) {
+                        console.log("QR Code detected:", code.data)
+                        setLastScanned(code.data)
+                        onScan(code.data)
+                        
+                        // Reset after 3 seconds
+                        setTimeout(() => setLastScanned(null), 3000)
+                    }
+                }
+            } catch (e) {
+                // Ignore QR decode errors
+            }
+        }
+
+        if (scanningRef.current) {
+            requestAnimationFrame(scanFrame)
+        }
+    }
+
     const stopCamera = () => {
+        console.log("Stopping camera...")
+        scanningRef.current = false
+        
         if (streamRef.current) {
-            streamRef.current.getTracks().forEach(track => track.stop())
+            streamRef.current.getTracks().forEach(track => {
+                track.stop()
+                console.log("Track stopped:", track.kind)
+            })
             streamRef.current = null
         }
-        if (scanIntervalRef.current) {
-            clearInterval(scanIntervalRef.current)
-            scanIntervalRef.current = null
+        if (videoRef.current) {
+            videoRef.current.srcObject = null
         }
         setIsActive(false)
+        setLastScanned(null)
     }
 
-    const startScanning = () => {
-        // Using a simple interval-based approach
-        // In production, you might want to use a proper QR code library
-        scanIntervalRef.current = setInterval(() => {
-            if (videoRef.current && canvasRef.current) {
-                const canvas = canvasRef.current
-                const video = videoRef.current
-                const context = canvas.getContext('2d')
+    useEffect(() => {
+        return () => {
+            stopCamera()
+        }
+    }, [])
 
-                if (context && video.readyState === video.HAVE_ENOUGH_DATA) {
-                    canvas.height = video.videoHeight
-                    canvas.width = video.videoWidth
-                    context.drawImage(video, 0, 0, canvas.width, canvas.height)
-
-                    // For demo purposes, we'll use a click-to-scan approach
-                    // In production, integrate with a library like jsQR or html5-qrcode
-                }
-            }
-        }, 100)
-    }
-
-    // Manual input for demo purposes
+    // Manual input for testing
     const [manualInput, setManualInput] = useState("")
 
     const handleManualSubmit = () => {
@@ -84,59 +143,65 @@ export function QRScanner({ onScan, isProcessing = false }: QRScannerProps) {
         }
     }
 
-    useEffect(() => {
-        return () => {
-            stopCamera()
-        }
-    }, [])
-
     return (
         <div className="space-y-4">
-            <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
-                {isActive ? (
-                    <>
-                        <video
-                            ref={videoRef}
-                            className="w-full h-full object-cover"
-                            playsInline
-                            muted
-                        />
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="w-64 h-64 border-2 border-white/50 rounded-lg">
-                                <div className="absolute top-0 left-0 w-4 h-4 border-t-4 border-l-4 border-primary rounded-tl" />
-                                <div className="absolute top-0 right-0 w-4 h-4 border-t-4 border-r-4 border-primary rounded-tr" />
-                                <div className="absolute bottom-0 left-0 w-4 h-4 border-b-4 border-l-4 border-primary rounded-bl" />
-                                <div className="absolute bottom-0 right-0 w-4 h-4 border-b-4 border-r-4 border-primary rounded-br" />
-                            </div>
-                        </div>
-                        {isProcessing && (
-                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white" />
-                            </div>
-                        )}
-                    </>
-                ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground">
-                        <Camera className="w-16 h-16 mb-4" />
-                        <p>Camera is off</p>
+            <div className="relative aspect-video bg-black rounded-lg overflow-hidden border-4 border-dashed border-muted-foreground/20">
+                <video
+                    ref={videoRef}
+                    className={`w-full h-full object-cover ${isActive ? 'block' : 'hidden'}`}
+                    playsInline
+                    muted
+                    autoPlay
+                />
+                
+                {!isActive && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-muted-foreground bg-muted">
+                        <Camera className="w-16 h-16 mb-4 opacity-50" />
+                        <p className="text-sm">Click "Start Camera" to begin scanning</p>
                     </div>
                 )}
+                
+                {isActive && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="relative w-48 h-48 md:w-64 md:h-64">
+                            <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-green-500 rounded-tl-lg" />
+                            <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-green-500 rounded-tr-lg" />
+                            <div className="absolute bottom-0 left-0 w-8 h-8 border-b-4 border-l-4 border-green-500 rounded-bl-lg" />
+                            <div className="absolute bottom-0 right-0 w-8 h-8 border-b-4 border-r-4 border-green-500 rounded-br-lg" />
+                        </div>
+                    </div>
+                )}
+                
+                {isProcessing && (
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                        <div className="flex flex-col items-center gap-2 text-white">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white" />
+                            <p className="text-sm">Processing...</p>
+                        </div>
+                    </div>
+                )}
+                
                 <canvas ref={canvasRef} className="hidden" />
             </div>
 
-            <div className="flex gap-2">
+            <Button 
+                onClick={isActive ? stopCamera : startCamera} 
+                variant={isActive ? "destructive" : "default"}
+                className="w-full"
+                size="lg"
+            >
                 {isActive ? (
-                    <Button onClick={stopCamera} variant="destructive" className="flex-1">
+                    <>
                         <CameraOff className="w-4 h-4 mr-2" />
                         Stop Camera
-                    </Button>
+                    </>
                 ) : (
-                    <Button onClick={startCamera} className="flex-1">
+                    <>
                         <Camera className="w-4 h-4 mr-2" />
                         Start Camera
-                    </Button>
+                    </>
                 )}
-            </div>
+            </Button>
 
             {/* Manual Input (for testing without camera) */}
             <div className="pt-4 border-t">
@@ -144,16 +209,23 @@ export function QRScanner({ onScan, isProcessing = false }: QRScannerProps) {
                 <div className="flex gap-2">
                     <input
                         type="text"
-                        className="flex-1 px-3 py-2 border rounded-md"
+                        className="flex-1 px-3 py-2 border rounded-md text-sm"
                         placeholder="Paste application ID or QR data..."
                         value={manualInput}
                         onChange={(e) => setManualInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleManualSubmit()}
                     />
                     <Button onClick={handleManualSubmit} disabled={isProcessing || !manualInput.trim()}>
                         Submit
                     </Button>
                 </div>
             </div>
+
+            {hasPermission === false && (
+                <div className="p-3 bg-red-100 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg text-sm text-red-600 dark:text-red-400">
+                    Camera permission denied. Please allow camera access in your browser settings and refresh the page.
+                </div>
+            )}
         </div>
     )
 }

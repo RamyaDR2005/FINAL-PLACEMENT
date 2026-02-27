@@ -195,3 +195,13 @@ body {
     @apply pt-0;
   }
 }
+
+/* QR Scanner animation */
+@keyframes scan {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(240px);
+  }
+}

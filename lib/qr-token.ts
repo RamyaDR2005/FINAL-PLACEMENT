@@ -7,7 +7,11 @@
 
 import crypto from "crypto"
 
-const QR_TOKEN_SECRET = process.env.QR_TOKEN_SECRET || process.env.AUTH_SECRET || "fallback-secret"
+const QR_TOKEN_SECRET_ENV = process.env.QR_TOKEN_SECRET
+if (!QR_TOKEN_SECRET_ENV) {
+    throw new Error("QR_TOKEN_SECRET environment variable is required")
+}
+const QR_TOKEN_SECRET: string = QR_TOKEN_SECRET_ENV
 const TOKEN_EXPIRY_MS = 10 * 60 * 1000 // 10 minutes
 
 interface QRTokenPayload {

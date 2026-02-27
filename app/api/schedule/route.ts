@@ -108,6 +108,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
     }
 
+    // Convert type from frontend format (e.g., "group-discussion") to enum format (e.g., "GROUP_DISCUSSION")
+    const normalizedType = type.toUpperCase().replace(/-/g, '_')
+
     // Combine date and time
     const eventDateTime = new Date(`${date}T${time}:00`)
 
@@ -118,7 +121,7 @@ export async function POST(request: NextRequest) {
         date: eventDateTime,
         duration: duration || 60,
         location,
-        type: type.toUpperCase(),
+        type: normalizedType,
         company,
         maxAttendees,
         isVisible: isVisible ?? true,

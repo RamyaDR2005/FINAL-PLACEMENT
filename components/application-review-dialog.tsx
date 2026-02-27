@@ -144,14 +144,17 @@ export function ApplicationReviewDialog({
                 body: formData,
             })
 
+            const data = await response.json()
+
             if (!response.ok) {
-                throw new Error("Failed to upload file")
+                throw new Error(data.error || "Failed to upload file")
             }
 
-            const data = await response.json()
             setResumeUrl(data.url)
         } catch (error) {
             console.error("Error uploading resume:", error)
+            alert(error instanceof Error ? error.message : "Failed to upload file")
+            setResumeFile(null)
         } finally {
             setIsUploading(false)
         }

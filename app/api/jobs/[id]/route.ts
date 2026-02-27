@@ -127,36 +127,23 @@ export async function GET(
 
         const hasApplied = !!existingApplication
 
-        // Get user profile and placement status for eligibility check
-        const [userProfile, userPlacements] = await Promise.all([
-            prisma.profile.findUnique({
-                where: { userId: session.user.id },
-                select: {
-                    branch: true,
-                    batch: true,
-                    finalCgpa: true,
-                    cgpa: true,
-                    activeBacklogs: true,
-                    hasBacklogs: true,
-                    kycStatus: true,
-                }
-            }),
-            prisma.placement.findMany({
-                where: { userId: session.user.id },
-                select: { tier: true, isException: true }
-            })
-        ])
-
-        // Determine highest tier placement
-        let highestTierPlacement: string | null = null
-        const tierOrder = ["TIER_1", "TIER_2", "TIER_3", "DREAM"]
-        for (const placement of userPlacements) {
-            if (!placement.isException) {
-                if (!highestTierPlacement || tierOrder.indexOf(placement.tier) < tierOrder.indexOf(highestTierPlacement)) {
-                    highestTierPlacement = placement.tier
-                }
+        // Get user profile with placement status for eligibility check
+        const userProfile = await prisma.profile.findUnique({
+            where: { userId: session.user.id },
+            select: {
+                branch: true,
+                batch: true,
+                finalCgpa: true,
+                cgpa: true,
+                activeBacklogs: true,
+                hasBacklogs: true,
+                kycStatus: true,
+                highestPlacementTier: true,
             }
-        }
+        })
+
+        // Get highest tier placement from profile
+        const highestTierPlacement = userProfile?.highestPlacementTier || null
 
         // Calculate eligibility
         let isEligible = true

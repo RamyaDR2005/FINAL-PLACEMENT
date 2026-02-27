@@ -143,6 +143,11 @@ export async function PUT(request: NextRequest) {
     const currentKycStatus = existingProfile?.kycStatus || 'PENDING'
     const isAdminSetStatus = currentKycStatus === 'VERIFIED' || currentKycStatus === 'REJECTED'
 
+    // IMPORTANT: Remove kycStatus from sanitizedData if it's admin-set to prevent frontend from overwriting
+    if (isAdminSetStatus) {
+      delete sanitizedData.kycStatus
+    }
+
     // Check if College ID card is being uploaded or already exists
     const hasCollegeId = !!(sanitizedData.collegeIdCard || mergedData.collegeIdCard || existingProfile?.collegeIdCard)
 
@@ -215,6 +220,27 @@ export async function PUT(request: NextRequest) {
         delete sanitizedData[key]
       }
     })
+
+    // Convert casteCategory values to Prisma enum format
+    // Frontend sends "2A", "2B", etc. but Prisma enum expects "CAT_2A", "CAT_2B", etc.
+    if (sanitizedData.casteCategory) {
+      const casteCategoryMap: Record<string, string> = {
+        '1': 'CAT_1',
+        '2A': 'CAT_2A',
+        '2B': 'CAT_2B', 
+        '3A': 'CAT_3A',
+        '3B': 'CAT_3B',
+        'GEN': 'GEN',
+        'GENERAL': 'GEN',
+        'GM': 'GM',
+        'OBC': 'OBC',
+        'SC': 'SC',
+        'ST': 'ST',
+        'EWS': 'EWS',
+      }
+      const mappedValue = casteCategoryMap[sanitizedData.casteCategory.toUpperCase()]
+      sanitizedData.casteCategory = mappedValue || 'OTHER'
+    }
 
     // Convert empty strings to null and perform type casting for specific fields
     const numericFields = ['tenthPassingYear', 'tenthPercentage', 'twelfthPassingYear', 'twelfthPercentage', 'diplomaPercentage', 'finalCgpa', 'completionStep']

@@ -230,7 +230,22 @@ async function handleRoundBasedScan(
     // 3. Verify KYC status
     const profile = await prisma.profile.findUnique({
         where: { userId },
-        include: { user: { select: { name: true, email: true, image: true } } },
+        select: {
+            kycStatus: true,
+            firstName: true,
+            lastName: true,
+            usn: true,
+            branch: true,
+            profilePhoto: true,
+            finalCgpa: true,
+            cgpa: true,
+            resumeUpload: true,
+            resume: true,
+            callingMobile: true,
+            fatherMobile: true,
+            motherMobile: true,
+            user: { select: { name: true, email: true, image: true } },
+        },
     })
 
     if (!profile || profile.kycStatus !== "VERIFIED") {
@@ -256,9 +271,10 @@ async function handleRoundBasedScan(
                     email: profile.user?.email,
                     usn: profile.usn,
                     branch: profile.branch,
-                    photo: profile.profilePhoto || profile.user?.image,
+                    profilePhoto: profile.profilePhoto || profile.user?.image,
+                    phone: profile.callingMobile,
+                    parentPhone: profile.fatherMobile || profile.motherMobile,
                     cgpa: profile.finalCgpa || profile.cgpa,
-                    resume: profile.resumeUpload || profile.resume,
                 },
                 round: {
                     name: driveSession.round.name,
@@ -274,7 +290,7 @@ async function handleRoundBasedScan(
         )
     }
 
-    // 5. Check eligibility for this round (must have passed previous rounds)
+    // 5. Check eligibility for this round
     const allRounds = await prisma.jobRound.findMany({
         where: { jobId, isRemoved: false },
         orderBy: { order: "asc" },
@@ -282,16 +298,21 @@ async function handleRoundBasedScan(
 
     const previousRounds = allRounds.filter((r) => r.order < driveSession.round.order)
 
-    for (const prevRound of previousRounds) {
+    // For round 1, no previous round checks needed (eligibility is checked at application time)
+    // For subsequent rounds, must have PASSED (shortlisted) the immediate previous round
+    if (previousRounds.length > 0) {
+        // Get the immediate previous round (highest order among previous rounds)
+        const immediatePrevRound = previousRounds[previousRounds.length - 1]
+        
         const prevAttendance = await prisma.roundAttendance.findUnique({
-            where: { userId_roundId: { userId, roundId: prevRound.id } },
+            where: { userId_roundId: { userId, roundId: immediatePrevRound.id } },
         })
 
         if (!prevAttendance) {
             return NextResponse.json(
                 {
-                    error: `Student has not attended the "${prevRound.name}" round yet`,
-                    missingRound: prevRound.name,
+                    error: `Student has not attended the "${immediatePrevRound.name}" round yet`,
+                    missingRound: immediatePrevRound.name,
                 },
                 { status: 400 }
             )
@@ -300,8 +321,20 @@ async function handleRoundBasedScan(
         if (prevAttendance.status === "FAILED") {
             return NextResponse.json(
                 {
-                    error: `Student failed the "${prevRound.name}" round and is not eligible`,
-                    failedRound: prevRound.name,
+                    error: `Student was not shortlisted from "${immediatePrevRound.name}" round`,
+                    failedRound: immediatePrevRound.name,
+                },
+                { status: 400 }
+            )
+        }
+
+        // Must be explicitly PASSED (shortlisted) to proceed
+        if (prevAttendance.status !== "PASSED") {
+            return NextResponse.json(
+                {
+                    error: `Student has not been shortlisted for this round yet. Waiting for results from "${immediatePrevRound.name}"`,
+                    waitingForResults: true,
+                    pendingRound: immediatePrevRound.name,
                 },
                 { status: 400 }
             )
@@ -319,9 +352,10 @@ async function handleRoundBasedScan(
             email: profile.user?.email,
             usn: profile.usn,
             branch: profile.branch,
-            photo: profile.profilePhoto || profile.user?.image,
+            profilePhoto: profile.profilePhoto || profile.user?.image,
+            phone: profile.callingMobile,
+            parentPhone: profile.fatherMobile || profile.motherMobile,
             cgpa: profile.finalCgpa || profile.cgpa,
-            resume: profile.resumeUpload || profile.resume,
         },
         round: {
             id: roundId,

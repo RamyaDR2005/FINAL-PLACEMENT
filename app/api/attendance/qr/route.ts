@@ -3,6 +3,32 @@ import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import { generateQRToken } from "@/lib/qr-token"
 
+// Helper to check tier eligibility
+function canApplyToTier(studentTier: string | null, jobTier: string, isDreamOffer: boolean): { eligible: boolean; reason?: string } {
+    if (isDreamOffer) return { eligible: true }
+    if (!studentTier) return { eligible: true }
+
+    if (studentTier === "TIER_1") {
+        return { eligible: false, reason: "You are already placed in Tier 1 and blocked from further placements" }
+    }
+    if (studentTier === "TIER_2") {
+        if (jobTier === "TIER_1") return { eligible: true }
+        return { eligible: false, reason: "You are placed in Tier 2. You can only apply for Tier 1 jobs (>9 LPA)" }
+    }
+    if (studentTier === "TIER_3") {
+        if (jobTier === "TIER_1" || jobTier === "TIER_2") return { eligible: true }
+        return { eligible: false, reason: "You are placed in Tier 3. You can only apply for Tier 1 or Tier 2 jobs" }
+    }
+    return { eligible: true }
+}
+
+// Helper to extract batch year
+function getBatchYear(batch: string | null | undefined): string {
+    if (!batch || typeof batch !== 'string') return ""
+    const parts = batch.split('-')
+    return parts[parts.length - 1].trim()
+}
+
 // GET - Get QR token and round status for a student's job application
 export async function GET(request: NextRequest) {
     try {
@@ -35,10 +61,39 @@ export async function GET(request: NextRequest) {
             )
         }
 
-        // Check student is KYC verified
+        // Get job details for eligibility check
+        const job = await prisma.job.findUnique({
+            where: { id: jobId },
+            select: {
+                id: true,
+                title: true,
+                companyName: true,
+                tier: true,
+                isDreamOffer: true,
+                minCGPA: true,
+                allowedBranches: true,
+                eligibleBatch: true,
+                maxBacklogs: true,
+            },
+        })
+
+        if (!job) {
+            return NextResponse.json({ error: "Job not found" }, { status: 404 })
+        }
+
+        // Check student profile and KYC
         const profile = await prisma.profile.findUnique({
             where: { userId: session.user.id },
-            select: { kycStatus: true },
+            select: {
+                kycStatus: true,
+                finalCgpa: true,
+                cgpa: true,
+                branch: true,
+                batch: true,
+                activeBacklogs: true,
+                hasBacklogs: true,
+                highestPlacementTier: true,
+            },
         })
 
         if (!profile || profile.kycStatus !== "VERIFIED") {
@@ -47,6 +102,9 @@ export async function GET(request: NextRequest) {
                 { status: 403 }
             )
         }
+
+        // Check basic eligibility for this job
+        const eligibilityCheck = checkJobEligibility(profile, job)
 
         // Get all rounds for this job
         const rounds = await prisma.jobRound.findMany({
@@ -86,6 +144,7 @@ export async function GET(request: NextRequest) {
 
             let status: string
             let qrToken: string | null = null
+            let ineligibleReason: string | null = null
 
             if (attendance) {
                 // Already attended this round
@@ -93,9 +152,15 @@ export async function GET(request: NextRequest) {
             } else if (!latestSession) {
                 status = "NOT_STARTED"
             } else if (latestSession.status === "ACTIVE") {
-                // Check eligibility for this round (must have passed previous rounds)
-                const isEligible = checkEligibilityForRound(round.order, rounds, attendanceMap)
-                if (isEligible) {
+                // Check eligibility for this round
+                const roundEligibility = checkRoundEligibility(
+                    round.order,
+                    rounds,
+                    attendanceMap,
+                    eligibilityCheck
+                )
+
+                if (roundEligibility.eligible) {
                     // Generate a fresh signed QR token
                     qrToken = generateQRToken({
                         userId: session.user.id,
@@ -106,6 +171,7 @@ export async function GET(request: NextRequest) {
                     status = "ACTIVE"
                 } else {
                     status = "NOT_ELIGIBLE"
+                    ineligibleReason = roundEligibility.reason || null
                 }
             } else if (latestSession.status === "TEMP_CLOSED") {
                 status = "TEMP_CLOSED"
@@ -121,6 +187,7 @@ export async function GET(request: NextRequest) {
                 roundOrder: round.order,
                 status,
                 qrToken,
+                ineligibleReason,
                 attendance: attendance
                     ? {
                         markedAt: attendance.markedAt,
@@ -130,7 +197,10 @@ export async function GET(request: NextRequest) {
             }
         })
 
-        return NextResponse.json({ rounds: roundStatuses })
+        return NextResponse.json({ 
+            rounds: roundStatuses,
+            jobEligibility: eligibilityCheck
+        })
     } catch (error) {
         console.error("Error generating attendance QR:", error)
         return NextResponse.json({ error: "Internal server error" }, { status: 500 })
@@ -138,27 +208,125 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * Check if student is eligible for a given round
- * Student must have attended (and not failed) all previous non-removed rounds
+ * Check if student meets job eligibility criteria
  */
-function checkEligibilityForRound(
-    targetOrder: number,
-    allRounds: Array<{ id: string; order: number; isRemoved: boolean }>,
-    attendanceMap: Map<string, { status: string }>
-): boolean {
-    // For round 1, everyone is eligible
-    if (targetOrder === 1) return true
-
-    // Check all previous rounds (by order)
-    const previousRounds = allRounds
-        .filter((r) => r.order < targetOrder && !r.isRemoved)
-        .sort((a, b) => a.order - b.order)
-
-    for (const prevRound of previousRounds) {
-        const attendance = attendanceMap.get(prevRound.id)
-        if (!attendance) return false // Not attended
-        if (attendance.status === "FAILED") return false // Failed
+function checkJobEligibility(
+    profile: {
+        finalCgpa: number | null
+        cgpa: number | null
+        branch: string | null
+        batch: string | null
+        activeBacklogs: boolean
+        hasBacklogs: string | null
+        highestPlacementTier: string | null
+    },
+    job: {
+        tier: string
+        isDreamOffer: boolean
+        minCGPA: number | null
+        allowedBranches: string[]
+        eligibleBatch: string | null
+        maxBacklogs: number | null
+    }
+): { eligible: boolean; reason?: string } {
+    // Check placement tier eligibility
+    const tierCheck = canApplyToTier(profile.highestPlacementTier, job.tier, job.isDreamOffer)
+    if (!tierCheck.eligible) {
+        return tierCheck
     }
 
-    return true
+    // Check CGPA
+    const cgpa = profile.finalCgpa || profile.cgpa || 0
+    if (job.minCGPA && cgpa < job.minCGPA) {
+        return {
+            eligible: false,
+            reason: `Minimum CGPA required: ${job.minCGPA}. Your CGPA: ${cgpa.toFixed(2)}`
+        }
+    }
+
+    // Check branch
+    if (job.allowedBranches.length > 0 && profile.branch) {
+        if (!job.allowedBranches.includes(profile.branch)) {
+            return {
+                eligible: false,
+                reason: `Your branch (${profile.branch}) is not eligible for this job`
+            }
+        }
+    }
+
+    // Check batch
+    if (job.eligibleBatch && profile.batch) {
+        const studentBatchYear = getBatchYear(profile.batch)
+        const jobBatchYear = getBatchYear(job.eligibleBatch)
+        if (studentBatchYear !== jobBatchYear) {
+            return {
+                eligible: false,
+                reason: `Only ${job.eligibleBatch} batch is eligible. Your batch: ${profile.batch}`
+            }
+        }
+    }
+
+    // Check backlogs
+    const hasActiveBacklogs = profile.activeBacklogs || profile.hasBacklogs === "yes"
+    if (job.maxBacklogs !== null && job.maxBacklogs === 0 && hasActiveBacklogs) {
+        return {
+            eligible: false,
+            reason: "No active backlogs allowed for this job"
+        }
+    }
+
+    return { eligible: true }
+}
+
+/**
+ * Check if student is eligible for a given round
+ * Round 1: Must meet job eligibility criteria
+ * Round 2+: Must have been marked PASSED in the previous round
+ */
+function checkRoundEligibility(
+    targetOrder: number,
+    allRounds: Array<{ id: string; order: number; isRemoved: boolean }>,
+    attendanceMap: Map<string, { status: string }>,
+    jobEligibility: { eligible: boolean; reason?: string }
+): { eligible: boolean; reason?: string } {
+    // For round 1, check job eligibility criteria
+    if (targetOrder === 1) {
+        return jobEligibility
+    }
+
+    // For subsequent rounds, must have PASSED the immediate previous round
+    const previousRounds = allRounds
+        .filter((r) => r.order < targetOrder && !r.isRemoved)
+        .sort((a, b) => b.order - a.order) // Sort descending to get the immediate previous first
+
+    if (previousRounds.length === 0) {
+        return jobEligibility // No previous rounds, treat as round 1
+    }
+
+    // Get the immediate previous round
+    const immediatePrevRound = previousRounds[0]
+    const prevAttendance = attendanceMap.get(immediatePrevRound.id)
+
+    if (!prevAttendance) {
+        return {
+            eligible: false,
+            reason: "You have not attended the previous round yet"
+        }
+    }
+
+    // Must be explicitly marked as PASSED to proceed
+    if (prevAttendance.status !== "PASSED") {
+        if (prevAttendance.status === "FAILED") {
+            return {
+                eligible: false,
+                reason: "You were not shortlisted for this round"
+            }
+        }
+        return {
+            eligible: false,
+            reason: "Waiting for results from the previous round. Admin will shortlist for the next round."
+        }
+    }
+
+    return { eligible: true }
 }
