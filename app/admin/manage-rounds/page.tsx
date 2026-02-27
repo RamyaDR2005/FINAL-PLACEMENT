@@ -1,4 +1,4 @@
-﻿"use client"
+"use client"
 
 import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -1297,9 +1297,9 @@ export default function ManageRoundsPage() {
                                                                     </div>
                                                                 </div>
                                                             </td>
-                                                            <td className="p-3 font-mono text-sm">{a.profile?.usn || "ΓÇö"}</td>
-                                                            <td className="p-3 text-sm">{a.profile?.branch || "ΓÇö"}</td>
-                                                            <td className="p-3 text-sm">{(a.profile?.finalCgpa || a.profile?.cgpa)?.toFixed(2) || "ΓÇö"}</td>
+                                                            <td className="p-3 font-mono text-sm">{a.profile?.usn || "—"}</td>
+                                                            <td className="p-3 text-sm">{a.profile?.branch || "—"}</td>
+                                                            <td className="p-3 text-sm">{(a.profile?.finalCgpa || a.profile?.cgpa)?.toFixed(2) || "—"}</td>
                                                             <td className="p-3 text-sm">{a.round.name}</td>
                                                             <td className="p-3">{getAttendanceStatusBadge(a.status)}</td>
                                                             <td className="p-3 text-sm text-muted-foreground">{format(new Date(a.markedAt), "HH:mm")}</td>
@@ -1374,9 +1374,9 @@ export default function ManageRoundsPage() {
                                                         </div>
                                                         <div className="mt-3 grid grid-cols-2 gap-1 text-sm">
                                                             <span className="text-muted-foreground">Branch:</span>
-                                                            <span>{a.profile?.branch || "ΓÇö"}</span>
+                                                            <span>{a.profile?.branch || "—"}</span>
                                                             <span className="text-muted-foreground">CGPA:</span>
-                                                            <span>{(a.profile?.finalCgpa || a.profile?.cgpa)?.toFixed(2) || "ΓÇö"}</span>
+                                                            <span>{(a.profile?.finalCgpa || a.profile?.cgpa)?.toFixed(2) || "—"}</span>
                                                             <span className="text-muted-foreground">Round:</span>
                                                             <span>{a.round.name}</span>
                                                         </div>
@@ -1461,16 +1461,16 @@ export default function ManageRoundsPage() {
                                                                     </div>
                                                                 </div>
                                                             </td>
-                                                            <td className="p-3 font-mono text-sm">{s.usn || s.profile?.usn || "ΓÇö"}</td>
-                                                            <td className="p-3 text-sm">{s.profile?.branch || "ΓÇö"}</td>
-                                                            <td className="p-3 text-sm">{s.year || s.profile?.batch || "ΓÇö"}</td>
+                                                            <td className="p-3 font-mono text-sm">{s.usn || s.profile?.usn || "—"}</td>
+                                                            <td className="p-3 text-sm">{s.profile?.branch || "—"}</td>
+                                                            <td className="p-3 text-sm">{s.year || s.profile?.batch || "—"}</td>
                                                             <td className="p-3 text-sm font-semibold text-emerald-600">
-                                                                {s.package ? `Γé╣${s.package} LPA` : "ΓÇö"}
+                                                                {s.package ? `₹${s.package} LPA` : "—"}
                                                             </td>
                                                             <td className="p-3">
                                                                 <Badge variant="outline">{s.tier.replace("_", " ")}</Badge>
                                                             </td>
-                                                            <td className="p-3 text-sm">{s.role || "ΓÇö"}</td>
+                                                            <td className="p-3 text-sm">{s.role || "—"}</td>
                                                             <td className="p-3 text-sm text-muted-foreground">
                                                                 {format(new Date(s.selectedAt), "MMM dd, yyyy")}
                                                             </td>
