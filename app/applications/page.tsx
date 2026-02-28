@@ -33,6 +33,7 @@ import {
     Timer,
     ChevronDown,
     ChevronUp,
+    PartyPopper,
 } from "lucide-react"
 import { format } from "date-fns"
 import Link from "next/link"
@@ -71,6 +72,11 @@ interface RoundStatus {
     } | null
 }
 
+interface FinalSelection {
+    isSelected: boolean
+    selectedAt: string
+}
+
 export default function ApplicationsPage() {
     const [applications, setApplications] = useState<Application[]>([])
     const [loading, setLoading] = useState(true)
@@ -85,6 +91,7 @@ export default function ApplicationsPage() {
     const [roundQRUrls, setRoundQRUrls] = useState<Record<string, string>>({})
     const [loadingRounds, setLoadingRounds] = useState<Record<string, boolean>>({})
     const [refreshCountdown, setRefreshCountdown] = useState<number>(0)
+    const [finalSelections, setFinalSelections] = useState<Record<string, FinalSelection | null>>({})
 
     const fetchApplications = useCallback(async () => {
         try {
@@ -137,6 +144,9 @@ export default function ApplicationsPage() {
             if (res.ok) {
                 const data = await res.json()
                 setRoundStatuses((prev) => ({ ...prev, [appId]: data.rounds }))
+                
+                // Store final selection status
+                setFinalSelections((prev) => ({ ...prev, [appId]: data.finalSelected || null }))
 
                 // Generate QR codes for active rounds
                 for (const round of data.rounds) {
@@ -321,8 +331,18 @@ export default function ApplicationsPage() {
             ) : (
                 <div className="space-y-4">
                     {applications.map((app) => (
-                        <Card key={app.id} className="overflow-hidden">
+                        <Card 
+                            key={app.id} 
+                            className={`overflow-hidden ${finalSelections[app.id]?.isSelected ? 'ring-2 ring-green-500 dark:ring-green-400' : ''}`}
+                        >
                             <CardContent className="p-6">
+                                {/* Selected Banner - shown at top of card */}
+                                {finalSelections[app.id]?.isSelected && (
+                                    <div className="mb-4 -mx-6 -mt-6 px-6 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white flex items-center gap-2">
+                                        <PartyPopper className="h-5 w-5" />
+                                        <span className="font-semibold">🎉 You&apos;re Selected!</span>
+                                    </div>
+                                )}
                                 <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
                                     {/* Job Info */}
                                     <div className="flex-1 space-y-3">
@@ -451,6 +471,30 @@ export default function ApplicationsPage() {
                                 {/* Expandable Rounds Panel */}
                                 {expandedAppId === app.id && (
                                     <div className="mt-4 pt-4 border-t">
+                                        {/* Congratulations Banner for Final Selected */}
+                                        {finalSelections[app.id]?.isSelected && (
+                                            <div className="mb-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 border border-green-200 dark:border-green-800 rounded-lg">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="flex-shrink-0 w-12 h-12 bg-green-100 dark:bg-green-900/50 rounded-full flex items-center justify-center">
+                                                        <PartyPopper className="h-6 w-6 text-green-600 dark:text-green-400" />
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <h4 className="text-lg font-bold text-green-800 dark:text-green-300">
+                                                            🎉 Congratulations!
+                                                        </h4>
+                                                        <p className="text-sm text-green-700 dark:text-green-400">
+                                                            You have been <span className="font-semibold">selected</span> for the role of <span className="font-semibold">{app.job.title}</span> at <span className="font-semibold">{app.job.companyName}</span>!
+                                                        </p>
+                                                        {finalSelections[app.id]?.selectedAt && (
+                                                            <p className="text-xs text-green-600 dark:text-green-500 mt-1">
+                                                                Selected on {format(new Date(finalSelections[app.id]!.selectedAt), "MMMM d, yyyy 'at' h:mm a")}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
                                         <div className="flex items-center justify-between mb-3">
                                             <h4 className="font-semibold text-sm flex items-center gap-2">
                                                 <ShieldCheck className="h-4 w-4" />

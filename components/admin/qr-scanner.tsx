@@ -49,16 +49,23 @@ export function QRScanner({ onScan, isProcessing = false }: QRScannerProps) {
             if (videoRef.current) {
                 videoRef.current.srcObject = stream
                 
-                // Use a promise-based approach for play
-                try {
-                    await videoRef.current.play()
-                    console.log("Video playing")
-                    setIsActive(true)
-                    scanningRef.current = true
-                    requestAnimationFrame(scanFrame)
-                } catch (playError) {
-                    console.error("Play error:", playError)
-                    toast.error("Could not start video playback")
+                // Wait for metadata to load before playing
+                videoRef.current.onloadedmetadata = async () => {
+                    console.log("Video metadata loaded:", {
+                        width: videoRef.current?.videoWidth,
+                        height: videoRef.current?.videoHeight
+                    })
+                    
+                    try {
+                        await videoRef.current?.play()
+                        console.log("Video playing")
+                        setIsActive(true)
+                        scanningRef.current = true
+                        requestAnimationFrame(scanFrame)
+                    } catch (playError) {
+                        console.error("Play error:", playError)
+                        toast.error("Could not start video playback")
+                    }
                 }
             }
         } catch (error) {
@@ -70,6 +77,11 @@ export function QRScanner({ onScan, isProcessing = false }: QRScannerProps) {
 
     const scanFrame = () => {
         if (!scanningRef.current || !videoRef.current || !canvasRef.current) {
+            console.log("Scan frame early return:", { 
+                scanning: scanningRef.current, 
+                video: !!videoRef.current, 
+                canvas: !!canvasRef.current 
+            })
             return
         }
 
@@ -84,8 +96,14 @@ export function QRScanner({ onScan, isProcessing = false }: QRScannerProps) {
 
             try {
                 const imageData = context.getImageData(0, 0, canvas.width, canvas.height)
+                // Log every 60 frames to avoid console spam
+                if (Math.random() < 0.016) {
+                    console.log("Scanning frame:", { width: imageData.width, height: imageData.height })
+                }
+                
+                // Try multiple inversion attempts for better detection
                 const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                    inversionAttempts: "dontInvert",
+                    inversionAttempts: "attemptBoth",
                 })
 
                 if (code && code.data && !isProcessing) {
@@ -100,8 +118,10 @@ export function QRScanner({ onScan, isProcessing = false }: QRScannerProps) {
                     }
                 }
             } catch (e) {
-                // Ignore QR decode errors
+                console.error("QR decode error:", e)
             }
+        } else {
+            console.log("Video not ready:", video.readyState)
         }
 
         if (scanningRef.current) {
@@ -152,6 +172,7 @@ export function QRScanner({ onScan, isProcessing = false }: QRScannerProps) {
                     playsInline
                     muted
                     autoPlay
+                    webkit-playsinline="true"
                 />
                 
                 {!isActive && (

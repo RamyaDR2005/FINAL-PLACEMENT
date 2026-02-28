@@ -26,9 +26,12 @@ type ApplicationWithUser = {
             branch: string | null
             batch: string | null
             cgpa: number | null
+            finalCgpa: number | null
             callingMobile: string | null
             email: string | null
             resume: string | null
+            activeBacklogs: boolean
+            hasBacklogs: string | null
         } | null
     }
 }
@@ -76,16 +79,12 @@ export default async function JobApplicantsPage({ params }: { params: Promise<{ 
                                     branch: true,
                                     batch: true,
                                     cgpa: true,
+                                    finalCgpa: true,
                                     callingMobile: true,
                                     email: true,
                                     resume: true,
-                                }
-                            },
-                            responses: {
-                                include: {
-                                    field: {
-                                        select: { label: true }
-                                    }
+                                    activeBacklogs: true,
+                                    hasBacklogs: true,
                                 }
                             }
                         }
@@ -121,10 +120,11 @@ export default async function JobApplicantsPage({ params }: { params: Promise<{ 
             usn: profile?.usn || '',
             branch: profile?.branch || '',
             batch: profile?.batch || '',
-            cgpa: profile?.cgpa ?? null,
+            cgpa: profile?.finalCgpa || profile?.cgpa || null,
             appliedAt: app.appliedAt,
             resumeUrl: app.resumeUsed || profile?.resume || '',
-            responses: (app as any).responses || [],
+            activeBacklogs: profile?.activeBacklogs || false,
+            hasBacklogs: profile?.hasBacklogs || 'NO',
         }
     })
 

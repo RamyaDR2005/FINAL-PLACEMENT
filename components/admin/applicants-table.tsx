@@ -63,10 +63,8 @@ interface Applicant {
     cgpa: number | null
     appliedAt: Date
     resumeUrl: string
-    responses: {
-        field: { label: string }
-        value: string | null
-    }[]
+    activeBacklogs: boolean
+    hasBacklogs: string
 }
 
 interface ApplicantsTableProps {
@@ -83,6 +81,7 @@ const EXPORTABLE_FIELDS = [
     { key: "branch", label: "Branch" },
     { key: "batch", label: "Batch" },
     { key: "cgpa", label: "CGPA" },
+    { key: "activeBacklogs", label: "Active Backlogs" },
     { key: "appliedAt", label: "Applied Date" },
 ]
 
@@ -321,8 +320,9 @@ export function ApplicantsTable({ jobId, jobTitle, applicants }: ApplicantsTable
                                         <TableHead>Applicant</TableHead>
                                         <TableHead>USN</TableHead>
                                         <TableHead>Branch</TableHead>
+                                        <TableHead>Batch</TableHead>
                                         <TableHead>CGPA</TableHead>
-                                        <TableHead>Custom Responses</TableHead>
+                                        <TableHead>Backlogs</TableHead>
                                         <TableHead>Applied</TableHead>
                                         <TableHead className="w-12"></TableHead>
                                     </TableRow>
@@ -368,6 +368,9 @@ export function ApplicantsTable({ jobId, jobTitle, applicants }: ApplicantsTable
                                                 )}
                                             </TableCell>
                                             <TableCell>
+                                                <span className="text-sm">{applicant.batch || "-"}</span>
+                                            </TableCell>
+                                            <TableCell>
                                                 {applicant.cgpa ? (
                                                     <span className="font-medium">{applicant.cgpa.toFixed(2)}</span>
                                                 ) : (
@@ -375,14 +378,11 @@ export function ApplicantsTable({ jobId, jobTitle, applicants }: ApplicantsTable
                                                 )}
                                             </TableCell>
                                             <TableCell>
-                                                <div className="text-xs space-y-1 max-w-[200px]">
-                                                    {applicant.responses.length > 0 ? applicant.responses.map((resp, i) => (
-                                                        <div key={i} className="flex flex-col border-b last:border-0 pb-1">
-                                                            <span className="text-muted-foreground font-semibold uppercase text-[10px]">{resp.field.label}</span>
-                                                            <span className="truncate" title={resp.value || "No response"}>{resp.value || "No response"}</span>
-                                                        </div>
-                                                    )) : <span className="text-muted-foreground italic">No custom fields</span>}
-                                                </div>
+                                                {applicant.activeBacklogs ? (
+                                                    <Badge variant="destructive">Yes</Badge>
+                                                ) : (
+                                                    <Badge variant="secondary">No</Badge>
+                                                )}
                                             </TableCell>
                                             <TableCell>
                                                 <span className="text-sm text-muted-foreground">

@@ -197,9 +197,25 @@ export async function GET(request: NextRequest) {
             }
         })
 
+        // Check if student is finally selected for this job
+        const finalSelection = await (prisma as any).finalSelected.findFirst({
+            where: {
+                userId: session.user.id,
+                jobId,
+            },
+            select: {
+                id: true,
+                selectedAt: true,
+            },
+        })
+
         return NextResponse.json({ 
             rounds: roundStatuses,
-            jobEligibility: eligibilityCheck
+            jobEligibility: eligibilityCheck,
+            finalSelected: finalSelection ? {
+                isSelected: true,
+                selectedAt: finalSelection.selectedAt,
+            } : null
         })
     } catch (error) {
         console.error("Error generating attendance QR:", error)
